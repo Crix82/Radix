@@ -20,6 +20,51 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserDetailOut(UserOut):
+    collection_ids: list[int] = []
+
+
+class UserCreate(BaseModel):
+    name: str
+    email: EmailStr
+    role: UserRole = UserRole.user
+    collection_ids: list[int] = []
+    # If a password is set the user is active immediately; otherwise they are 'invited'
+    # and an admin activates them later by setting a password (SPEC §9, on-prem).
+    password: str | None = None
+
+
+class UserUpdate(BaseModel):
+    name: str | None = None
+    role: UserRole | None = None
+    status: UserStatus | None = None
+    password: str | None = None
+    collection_ids: list[int] | None = None
+
+
+class CollectionCreate(BaseModel):
+    name: str
+
+
+class CollectionOut(BaseModel):
+    id: int
+    name: str
+    document_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class AuditEntryOut(BaseModel):
+    id: int
+    ts: datetime
+    user_id: int | None
+    user_email: str | None
+    action: str
+    object_type: str | None
+    object_id: str | None
+    ip: str | None
+
+
 class SourceCreate(BaseModel):
     type: SourceType
     path: str | None = None

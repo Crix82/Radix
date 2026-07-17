@@ -1,3 +1,4 @@
+import ipaddress
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -9,6 +10,22 @@ from app.core.security import decode_session_token
 from app.models import User, UserRole, UserStatus
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def client_ip(request: Request) -> str | None:
+    """The caller's IP for the audit `ip` (INET) column, or None if it isn't a valid IP.
+
+    Behind Caddy this is the proxy address; a non-IP host (e.g. a test client) must not
+    reach the INET column or the INSERT fails on Postgres.
+    """
+    host = request.client.host if request.client else None
+    if not host:
+        return None
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return None
+    return host
 
 
 def get_current_user(request: Request, db: DbSession) -> User:

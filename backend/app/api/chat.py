@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.search import _effective_collections
 from app.core.db import SessionLocal
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, client_ip
 from app.core.permissions import allowed_collection_ids
 from app.core.settings_store import get_refusal_threshold
 from app.models import AuditLog
@@ -60,7 +60,7 @@ def chat(
             user_id=user.id,
             action="chat",
             meta={"q": question},
-            ip=request.client.host if request.client else None,
+            ip=client_ip(request),
         )
     )
     db.commit()

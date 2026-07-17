@@ -37,18 +37,18 @@ def test_get_document_requires_auth(client: TestClient, api_db: Session) -> None
     assert client.get("/api/v1/documents/1").status_code == 401
 
 
-def test_get_document_metadata(client: TestClient, api_db: Session, plain_user: User) -> None:
+def test_get_document_metadata(client: TestClient, api_db: Session, admin_user: User) -> None:
     doc = _seed_pdf_document(api_db)
     body = client.get(f"/api/v1/documents/{doc.id}").json()
     assert body["pages"] == 2 and body["lang"] == "en"
     assert body["status"] == "chunking"
 
 
-def test_get_document_404(client: TestClient, api_db: Session, plain_user: User) -> None:
+def test_get_document_404(client: TestClient, api_db: Session, admin_user: User) -> None:
     assert client.get("/api/v1/documents/999").status_code == 404
 
 
-def test_page_png_renders_and_caches(client: TestClient, api_db: Session, plain_user: User) -> None:
+def test_page_png_renders_and_caches(client: TestClient, api_db: Session, admin_user: User) -> None:
     doc = _seed_pdf_document(api_db)
     resp = client.get(f"/api/v1/documents/{doc.id}/pages/1.png")
     assert resp.status_code == 200
@@ -60,12 +60,12 @@ def test_page_png_renders_and_caches(client: TestClient, api_db: Session, plain_
     assert (pagecache_dir() / str(doc.id) / "1.png").is_file()
 
 
-def test_page_png_out_of_range_404(client: TestClient, api_db: Session, plain_user: User) -> None:
+def test_page_png_out_of_range_404(client: TestClient, api_db: Session, admin_user: User) -> None:
     doc = _seed_pdf_document(api_db)
     assert client.get(f"/api/v1/documents/{doc.id}/pages/9.png").status_code == 404
 
 
-def test_page_png_non_pdf_415(client: TestClient, api_db: Session, plain_user: User) -> None:
+def test_page_png_non_pdf_415(client: TestClient, api_db: Session, admin_user: User) -> None:
     doc = _seed_pdf_document(api_db, rel_path="report.docx")
     assert client.get(f"/api/v1/documents/{doc.id}/pages/1.png").status_code == 415
 

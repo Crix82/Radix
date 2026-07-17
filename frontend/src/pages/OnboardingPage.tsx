@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 import { t } from "../i18n";
 
 const steps = [
@@ -7,6 +9,7 @@ const steps = [
 ];
 
 export function OnboardingPage() {
+  const navigate = useNavigate();
   return (
     <div className="mx-auto max-w-[660px] pt-[30px]">
       <div className="mb-[10px] font-mono text-[11px] tracking-[.12em] text-petrol">
@@ -35,7 +38,7 @@ export function OnboardingPage() {
       </div>
 
       <div className="mb-[22px] flex items-center gap-[18px]">
-        <button className="btn-primary" disabled title={t.common.comingSoon}>
+        <button className="btn-primary" onClick={() => navigate("/sources")}>
           <svg
             viewBox="0 0 24 24"
             fill="none"

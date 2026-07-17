@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, client_ip
 from app.core.security import (
     create_session_token,
     login_rate_limiter,
@@ -16,8 +16,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=UserOut)
 def login(body: LoginRequest, request: Request, response: Response, db: DbSession) -> User:
-    client_ip = request.client.host if request.client else "unknown"
-    if not login_rate_limiter.allow(client_ip):
+    # Rate-limit key tolerates a non-IP host; the audited IP must be a valid INET or NULL.
+    rate_key = request.client.host if request.client else "unknown"
+    if not login_rate_limiter.allow(rate_key):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many login attempts"
         )
@@ -41,7 +42,7 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbSessio
         secure=not settings.debug,
         max_age=settings.jwt_expire_minutes * 60,
     )
-    db.add(AuditLog(user_id=user.id, action="login", ip=client_ip))
+    db.add(AuditLog(user_id=user.id, action="login", ip=client_ip(request)))
     db.commit()
     return user
 

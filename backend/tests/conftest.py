@@ -82,7 +82,7 @@ def api_db(client: TestClient, db_session: Session) -> Session:
 def _make_user(db: Session, role: UserRole) -> User:
     user = User(
         name="Test",
-        email=f"{role.value}@test.local",
+        email=f"{role.value}@example.com",
         password_hash="x",
         role=role,
         status=UserStatus.active,

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, Request
 
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, client_ip
 from app.core.permissions import allowed_collection_ids
 from app.models import AuditLog
 from app.models.schemas import SearchDocumentRef, SearchResultOut
@@ -47,7 +47,7 @@ def search(
             user_id=user.id,
             action="search",
             meta={"q": q, "lang": lang, "doc_type": doc_type, "results": len(results)},
-            ip=request.client.host if request.client else None,
+            ip=client_ip(request),
         )
     )
     db.commit()
