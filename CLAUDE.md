@@ -12,6 +12,9 @@ source of truth for the UI. Work proceeds one milestone at a time (SPEC §11).
 - Type hints everywhere; `make lint` runs `ruff` (check + format) and `mypy` on the backend,
   `tsc --noEmit` on the frontend. No merge with red tests.
 - Every pipeline service and every endpoint gets pytest coverage.
+- Tests run on in-memory SQLite (no Docker needed): Postgres-only column types must use
+  `with_variant` fallbacks (see `app/models/tables.py`); the `chunks` table (tsvector)
+  stays Postgres-only and is excluded from SQLite test schemas.
 - Conventional commits (`feat:`, `fix:`, `chore:`, …).
 
 ## Dependencies & licenses

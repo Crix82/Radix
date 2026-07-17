@@ -236,3 +236,4 @@ Regola: solo licenze permissive (Apache-2.0, MIT, BSD e simili). Vietate AGPL, S
 - 2026-07-17 · v1 iniziale — scope: modulo Radix (PRD §4), milestone M0–M6.
 - 2026-07-17 · Rinominata l'applicazione da "Knowledge" a "Radix" (spec, mock e struttura file aggiornati).
 - 2026-07-17 · M0 Scaffold: struttura repo, compose prod+dev, migrazione Alembic iniziale, Makefile, CLAUDE.md, auth di base, shell frontend con login. `make lint`, `make test` (10 test) e `make licenses` verdi. Decisioni in `docs/adr/0001`.
+- 2026-07-17 · M1 Ingestione e fonti: CRUD `/sources`, `POST /uploads`, discover con dedupe sha256 e repository interno, tombstone dei file rimossi, watcher periodico nel worker, `/indexing/stats|queue`, `exclude`/`reindex`; UI Fonti (tabella + modale dal mock) e UI Indicizzazione con dati reali. Migrazione 0002, 5 PDF di fixture generati. `make lint`, `make test` (43 test) e `make licenses` verdi. Decisioni in `docs/adr/0002`.

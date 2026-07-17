@@ -33,4 +33,42 @@
   .field-input {
     @apply w-full border border-line rounded-sm px-[11px] py-[9px] text-[13px] bg-surface text-ink focus:outline-none focus:border-petrol-mid;
   }
+  .btn-plain {
+    @apply btn px-[10px] text-ink2 hover:bg-line2 hover:text-ink;
+  }
+  /* Status chips (mock: .chip*) */
+  .chip {
+    @apply inline-flex items-center gap-[5px] whitespace-nowrap rounded-full px-[9px] py-[2.5px] text-[11.5px] font-semibold;
+  }
+  .chip-ok {
+    @apply chip bg-ok-tint text-ok;
+  }
+  .chip-err {
+    @apply chip bg-err-tint text-err;
+  }
+  .chip-petrol {
+    @apply chip bg-petrol-tint text-petrol;
+  }
+  .chip-neutral {
+    @apply chip bg-line2 text-ink2;
+  }
+  /* Table cells (mock: th/td) */
+  .th {
+    @apply border-b border-line px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[.08em] text-ink3;
+  }
+  .td {
+    @apply border-b border-line2 px-4 py-[13px] align-middle text-[13px];
+  }
+  .act-link {
+    @apply text-[12px] font-semibold text-petrol hover:underline disabled:no-underline;
+  }
+  .progress {
+    @apply mt-[6px] h-[5px] w-[120px] overflow-hidden rounded-full bg-line2;
+  }
+  .progress-bar {
+    @apply block h-full rounded-full bg-petrol-mid;
+  }
+  tbody tr:last-child .td {
+    @apply border-b-0;
+  }
 }

@@ -2,9 +2,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
 import { t } from "./i18n";
+import { IndexingPage } from "./pages/IndexingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { SourcesPage } from "./pages/SourcesPage";
 
 export function App() {
   return (
@@ -32,26 +34,8 @@ export function App() {
             />
           }
         />
-        <Route
-          path="/sources"
-          element={
-            <PlaceholderPage
-              title={t.pages.sources.title}
-              subtitle={t.pages.sources.subtitle}
-              note={t.pages.sources.placeholder}
-            />
-          }
-        />
-        <Route
-          path="/indexing"
-          element={
-            <PlaceholderPage
-              title={t.pages.indexing.title}
-              subtitle={t.pages.indexing.subtitle}
-              note={t.pages.indexing.placeholder}
-            />
-          }
-        />
+        <Route path="/sources" element={<SourcesPage />} />
+        <Route path="/indexing" element={<IndexingPage />} />
         <Route
           path="/users"
           element={

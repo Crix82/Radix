@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Computed,
@@ -18,6 +19,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# Postgres-native types in production, plain fallbacks so tests can run on SQLite.
+JSONB_V = JSON().with_variant(JSONB(), "postgresql")
+INET_V = String(45).with_variant(INET(), "postgresql")
+# SQLite only autoincrements INTEGER primary keys, never BIGINT.
+BIGPK = BigInteger().with_variant(Integer(), "sqlite")
 
 
 class Base(DeclarativeBase):
@@ -113,7 +120,8 @@ class Document(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"))
+    # Nullable: documents outlive their source (tombstones keep history after DELETE /sources).
+    source_id: Mapped[int | None] = mapped_column(ForeignKey("sources.id", ondelete="SET NULL"))
     collection_id: Mapped[int] = mapped_column(ForeignKey("collections.id"))
     rel_path: Mapped[str] = mapped_column(Text)
     title: Mapped[str | None] = mapped_column(Text)
@@ -147,13 +155,13 @@ class Chunk(Base):
     __tablename__ = "chunks"
     __table_args__ = (Index("ix_chunks_tsv", "tsv", postgresql_using="gin"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BIGPK, primary_key=True)
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     page_start: Mapped[int] = mapped_column(Integer)
     page_end: Mapped[int] = mapped_column(Integer)
     heading_path: Mapped[str | None] = mapped_column(Text)
     text: Mapped[str] = mapped_column(Text)
-    bboxes: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    bboxes: Mapped[dict[str, Any] | None] = mapped_column(JSONB_V)
     lang: Mapped[str | None] = mapped_column(String(10))
     tsv: Mapped[Any] = mapped_column(TSVECTOR, Computed(CHUNK_TSV_EXPRESSION, persisted=True))
 
@@ -179,18 +187,18 @@ class DocumentTag(Base):
 class AuditLog(Base):
     __tablename__ = "audit_log"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BIGPK, primary_key=True)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String(50))
     object_type: Mapped[str | None] = mapped_column(String(50))
     object_id: Mapped[str | None] = mapped_column(String(100))
-    meta: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    ip: Mapped[str | None] = mapped_column(INET)
+    meta: Mapped[dict[str, Any] | None] = mapped_column(JSONB_V)
+    ip: Mapped[str | None] = mapped_column(INET_V)
 
 
 class Setting(Base):
     __tablename__ = "settings"
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
-    value: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    value: Mapped[dict[str, Any] | None] = mapped_column(JSONB_V)

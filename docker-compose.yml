@@ -33,9 +33,12 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-radix}:${POSTGRES_PASSWORD:-radix}@postgres:5432/${POSTGRES_DB:-radix}
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
+      DATA_DIR: /data
     volumes:
       - ${DATA_DIR:-./data}/repository:/data/repository
       - ${DATA_DIR:-./data}/pagecache:/data/pagecache
+      # Folder sources (type local/smb) must live under this mount to be visible in-container.
+      - ${SOURCES_DIR:-./data/sources}:/data/sources
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=5)"]
       interval: 15s
@@ -59,9 +62,11 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-radix}:${POSTGRES_PASSWORD:-radix}@postgres:5432/${POSTGRES_DB:-radix}
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
+      DATA_DIR: /data
     volumes:
       - ${DATA_DIR:-./data}/repository:/data/repository
       - ${DATA_DIR:-./data}/pagecache:/data/pagecache
+      - ${SOURCES_DIR:-./data/sources}:/data/sources
     depends_on:
       postgres:
         condition: service_healthy

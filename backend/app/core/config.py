@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ocr_langs: str = "ita+eng+deu"
     sync_interval_min: int = 5
     data_dir: str = "./data"
+    storage_capacity_gb: int = 500  # per-installation corpus budget (SPEC §1)
 
     jwt_secret: str = "change-me-this-is-only-a-dev-placeholder-secret"
     jwt_expire_minutes: int = 60 * 12

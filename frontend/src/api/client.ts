@@ -8,9 +8,12 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  // FormData bodies must set their own multipart boundary — no explicit Content-Type.
+  const jsonHeaders: Record<string, string> =
+    init?.body instanceof FormData ? {} : { "Content-Type": "application/json" };
   const resp = await fetch(`/api/v1${path}`, {
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { ...jsonHeaders, ...init?.headers },
     ...init,
   });
   if (!resp.ok) {
