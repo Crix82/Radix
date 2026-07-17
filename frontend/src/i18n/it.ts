@@ -62,7 +62,26 @@ export const it = {
       title: "Chat",
       subtitle:
         "Risposte basate esclusivamente sui documenti indicizzati, con citazione alla pagina",
-      placeholder: "La chat arriva con la milestone M4.",
+      inputPlaceholder: "Fai una domanda sulla documentazione…",
+      inputLabel: "Scrivi una domanda",
+      searching: "Radix sta cercando nei documenti…",
+      sources: "FONTI",
+      refusalTitle: "Non presente nella documentazione indicizzata",
+      refusalBody: "Nessun documento indicizzato copre questa richiesta.",
+      refusalAddSource: "Se disponi del documento, puoi aggiungerlo dalla sezione Fonti.",
+      empty: "Fai una domanda: Radix risponderà citando la pagina esatta dei documenti.",
+      error: "Errore durante la generazione della risposta. Riprova.",
+      pageAbbr: "pag.",
+    },
+    viewer: {
+      backToChat: "← Torna alla chat",
+      backToSearch: "← Torna alla ricerca",
+      back: "← Indietro",
+      pageOf: (n: number, total: number | null) =>
+        total ? `pag. ${n} di ${total}` : `pag. ${n}`,
+      loading: "Caricamento pagina…",
+      pageError: "Impossibile caricare la pagina.",
+      citedPassage: "passaggio citato nella risposta",
     },
     sources: {
       title: "Fonti",

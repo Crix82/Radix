@@ -32,6 +32,8 @@ dev = [
     "mypy>=1.11",
     "pip-licenses>=4.4",
     "types-redis",
+    "pyyaml>=6.0",
+    "types-pyyaml",
 ]
 
 [build-system]

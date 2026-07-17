@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 import { search, type SearchResult } from "../api/search";
 import { PageHead } from "../components/Layout";
@@ -29,10 +30,18 @@ function RelevanceDots({ score, top }: { score: number; top: number }) {
   );
 }
 
-function ResultCard({ result, top }: { result: SearchResult; top: number }) {
+function ResultCard({
+  result,
+  top,
+  onOpen,
+}: {
+  result: SearchResult;
+  top: number;
+  onOpen: () => void;
+}) {
   const { document: doc } = result;
   return (
-    <button type="button" className="result">
+    <button type="button" className="result" onClick={onOpen}>
       <div className="mb-[5px] flex flex-wrap items-center gap-2">
         <span className="text-[14px] font-semibold text-ink">{doc.title ?? doc.rel_path}</span>
         {doc.lang && <span className="badge-lang">{doc.lang.toUpperCase()}</span>}
@@ -56,9 +65,13 @@ function ResultCard({ result, top }: { result: SearchResult; top: number }) {
 export function SearchPage() {
   const [query, setQuery] = useState("");
   const [lang, setLang] = useState<string | undefined>(undefined);
+  const navigate = useNavigate();
   const searchMutation = useMutation({
     mutationFn: (q: string) => search({ q, lang }),
   });
+
+  const openResult = (r: SearchResult) =>
+    navigate(`/viewer/${r.document.id}/${r.page}`, { state: { from: "ricerca" } });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +145,7 @@ export function SearchPage() {
               <div className="mb-3 text-[12px] text-ink3">{s.resultsCount(results.length)}</div>
               <div className="flex flex-col gap-[10px]">
                 {results.map((r) => (
-                  <ResultCard key={r.chunk_id} result={r} top={top} />
+                  <ResultCard key={r.chunk_id} result={r} top={top} onOpen={() => openResult(r)} />
                 ))}
               </div>
             </>

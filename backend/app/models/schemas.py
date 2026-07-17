@@ -106,6 +106,22 @@ class SearchResultOut(BaseModel):
     score: float
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatFilters(BaseModel):
+    lang: str | None = None
+    doc_type: str | None = None
+    collection_id: int | None = None
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
+    filters: ChatFilters = ChatFilters()
+
+
 class ComponentHealth(BaseModel):
     status: str  # "ok" | "error"
     detail: str | None = None

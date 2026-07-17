@@ -32,9 +32,10 @@ test-integration:  ## real Docling + Tesseract pipeline (needs both installed; s
 	cd backend && .venv/bin/python -m pytest -q -m slow
 
 lint:
-	cd backend && .venv/bin/ruff check app worker tests migrations
-	cd backend && .venv/bin/ruff format --check app worker tests migrations
+	cd backend && .venv/bin/ruff check app worker tests migrations ../eval
+	cd backend && .venv/bin/ruff format --check app worker tests migrations ../eval
 	cd backend && .venv/bin/mypy app worker
+	cd backend && .venv/bin/mypy --explicit-package-bases ../eval/run_eval.py
 	cd frontend && npm run typecheck
 
 licenses:  ## fail on any non-permissive license (SPEC §14)
@@ -51,8 +52,8 @@ licenses:  ## fail on any non-permissive license (SPEC §14)
 
 ## --- Later milestones ---
 
-eval:  ## RAG quality harness (M4)
-	@echo "make eval arrives with milestone M4 (eval/run_eval.py)" && exit 1
+eval:  ## RAG quality harness — needs an indexed corpus + running LLM (see eval/run_eval.py)
+	$(BACKEND_PY) eval/run_eval.py
 
 backup:  ## full backup: postgres + qdrant + repository + config (M6)
 	./deploy/backup.sh

@@ -1,3 +1,39 @@
-# Eval set for the RAG harness (SPEC §11, M4): at least 10 questions with expected
-# document and page. Populated in M4 together with eval/run_eval.py.
-questions: []
+# RAG eval set (SPEC §11, M4). Questions are answerable from the 5 checked-in fixture
+# PDFs (backend/tests/fixtures) plus the scanned Italian fixture, once indexed.
+# `doc` is matched as a substring of the document rel_path/title; `page` must appear in
+# the answer's citations. Cross-lingual and OCR cases are included on purpose.
+questions:
+  - q: "Qual è la coppia di serraggio dei bulloni della testata dell'RS-30?"
+    doc: "RS-30_instruction_manual.pdf"
+    page: 2
+  - q: "A quale valore vanno serrati i cylinder head bolts del compressore RS-30?"
+    doc: "RS-30_instruction_manual.pdf"
+    page: 2
+  - q: "Cosa bisogna fare prima di mettere in funzione l'unità RS-30?"
+    doc: "RS-30_instruction_manual.pdf"
+    page: 1
+  - q: "Ogni quanto va controllato il livello dell'olio idraulico della pressa HP-200?"
+    doc: "HP-200_wartungshandbuch.pdf"
+    page: 1
+  - q: "Come si avvia il ciclo automatico della linea L12?"
+    doc: "L12_manuale_operatore.pdf"
+    page: 2
+  - q: "Quali dispositivi di protezione vanno indossati sulla linea L12?"
+    doc: "L12_manuale_operatore.pdf"
+    page: 1
+  - q: "Qual è il codice della guarnizione della testata per l'RS-30?"
+    doc: "catalogo_ricambi_2024.pdf"
+    page: 1
+  - q: "Qual è il codice del filtro olio per la linea L12?"
+    doc: "catalogo_ricambi_2024.pdf"
+    page: 1
+  - q: "Qual è il rapporto di miscelazione della resina EP-204?"
+    doc: "formulazione_EP-204.pdf"
+    page: 1
+  - q: "Ogni quanto va sostituito il filtro secondo il manuale di manutenzione scansionato?"
+    doc: "scansione_ita_manutenzione.pdf"
+    page: 1
+
+# Out-of-corpus question: must produce the exact refusal phrase, no LLM call.
+refusal:
+  - q: "Qual è la coppia di serraggio per i bulloni della testata del modello RS-55?"
