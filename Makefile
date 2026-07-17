@@ -3,7 +3,7 @@ COMPOSE_DEV  = $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 BACKEND_PY   = backend/.venv/bin/python
 BACKEND_BIN  = backend/.venv/bin
 
-.PHONY: up up-prod down logs test lint licenses eval backup restore venv
+.PHONY: up up-prod down logs test test-integration lint licenses eval backup restore venv
 
 ## --- Stack ---
 
@@ -25,8 +25,11 @@ venv:  ## create the backend virtualenv with dev dependencies
 	python3 -m venv backend/.venv
 	$(BACKEND_PY) -m pip install -q -e "backend/.[dev]"
 
-test:
-	cd backend && .venv/bin/python -m pytest -q
+test:  ## fast suite (SQLite, no Docling/torch)
+	cd backend && .venv/bin/python -m pytest -q -m "not slow"
+
+test-integration:  ## real Docling + Tesseract pipeline (needs both installed; see ADR 0003)
+	cd backend && .venv/bin/python -m pytest -q -m slow
 
 lint:
 	cd backend && .venv/bin/ruff check app worker tests migrations

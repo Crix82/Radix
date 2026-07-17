@@ -19,6 +19,9 @@ dependencies = [
     "pyjwt>=2.9",
     "httpx>=0.27",
     "python-multipart>=0.0.9",
+    "pypdfium2>=4.30",
+    "pillow>=10.4",
+    "docling>=2.7",
 ]
 
 [project.optional-dependencies]
@@ -52,3 +55,6 @@ exclude = ["tests/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: real Docling/Tesseract pipeline (skipped unless installed)",
+]

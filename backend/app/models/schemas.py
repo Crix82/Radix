@@ -56,9 +56,12 @@ class DocumentOut(BaseModel):
     collection_id: int
     rel_path: str
     title: str | None
+    lang: str | None
+    doc_type: str | None
     status: DocumentStatus
     error_msg: str | None
     size_bytes: int | None
+    pages: int | None
     updated_at: datetime
 
     model_config = {"from_attributes": True}

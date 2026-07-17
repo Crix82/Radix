@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException, status
+from pathlib import Path
 
-from app.core.deps import AdminUser, DbSession
+from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import FileResponse
+
+from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.core.queue import enqueue_parse_document
 from app.models import AuditLog, Document, DocumentStatus
 from app.models.schemas import DocumentOut
+from app.services import ingest
+from app.services.rendering import PageOutOfRange, render_page
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -48,8 +53,29 @@ def reindex_document(document_id: int, db: DbSession, admin: AdminUser) -> Docum
     return document
 
 
-@router.get("/{document_id}", include_in_schema=False)
-def not_implemented(document_id: int) -> None:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Planned for milestone M2"
+@router.get("/{document_id}", response_model=DocumentOut)
+def get_document(document_id: int, db: DbSession, _user: CurrentUser) -> Document:
+    return _get_document(db, document_id)
+
+
+@router.get("/{document_id}/pages/{page_number}.png")
+def get_page_image(
+    document_id: int, page_number: int, db: DbSession, _user: CurrentUser
+) -> FileResponse:
+    document = _get_document(db, document_id)
+    if Path(document.rel_path).suffix.lower() != ".pdf":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Page rendering is available for PDF documents only",
+        )
+    pdf_path = ingest.original_path(document)
+    if not pdf_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Original file missing")
+    try:
+        image_path = render_page(document.id, pdf_path, page_number)
+    except PageOutOfRange as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    # Page images are immutable per (document, page): the cache key is the content itself.
+    return FileResponse(
+        image_path, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"}
     )

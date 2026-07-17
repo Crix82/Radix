@@ -14,7 +14,10 @@ source of truth for the UI. Work proceeds one milestone at a time (SPEC §11).
 - Every pipeline service and every endpoint gets pytest coverage.
 - Tests run on in-memory SQLite (no Docker needed): Postgres-only column types must use
   `with_variant` fallbacks (see `app/models/tables.py`); the `chunks` table (tsvector)
-  stays Postgres-only and is excluded from SQLite test schemas.
+  stays Postgres-only and is excluded from SQLite test schemas (tests that need it build a
+  tsvector-free copy via `create_sqlite_chunks_table`).
+- Heavy deps (Docling/torch) must stay behind lazy imports so unit tests never load them;
+  real-pipeline tests are marked `slow` and `importorskip` when Docling/Tesseract are absent.
 - Conventional commits (`feat:`, `fix:`, `chore:`, …).
 
 ## Dependencies & licenses

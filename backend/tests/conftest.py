@@ -3,7 +3,16 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import (
+    Column,
+    Engine,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+)
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -14,10 +23,32 @@ from app.main import app
 from app.models import Base, User, UserRole, UserStatus
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-FIXTURE_PDFS = sorted(FIXTURES_DIR.glob("*.pdf"))
+# The 5 born-digital manuals used by the M1 ingest tests (excludes the M2 scanned fixture).
+FIXTURE_PDFS = sorted(p for p in FIXTURES_DIR.glob("*.pdf") if not p.name.startswith("scansione"))
+SCANNED_PDF = FIXTURES_DIR / "scansione_ita_manutenzione.pdf"
 
 # The chunks table needs Postgres (tsvector + regconfig); every other table runs on SQLite.
 SQLITE_TABLES = [t for name, t in Base.metadata.tables.items() if name != "chunks"]
+
+
+def create_sqlite_chunks_table(engine: Engine) -> None:
+    """A tsvector-free `chunks` table so worker/pipeline tests can insert on SQLite."""
+    md = MetaData()
+    Table(
+        "chunks",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("document_id", Integer),
+        Column("page_start", Integer),
+        Column("page_end", Integer),
+        Column("heading_path", Text),
+        Column("text", Text),
+        Column("bboxes", Text),
+        Column("lang", String(10)),
+        Column("tsv", Text),  # placeholder for the Postgres computed column
+        extend_existing=True,
+    )
+    md.create_all(engine)
 
 
 @pytest.fixture
