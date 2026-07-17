@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radix — Mock v1 · Flussi utente</title>
+<style>
+  :root{
+    --bg:#F1F4F6; --surface:#FFFFFF; --line:#E0E6EA; --line2:#EDF1F3;
+    --ink:#182730; --ink2:#5D6E77; --ink3:#8A9BA4;
+    --petrol:#0E5B66; --petrol-strong:#0A464F; --petrol-tint:#E4EEF0; --petrol-mid:#2E8A97;
+    --nav:#14262D; --nav2:#1E3842; --navtext:#D9E5E8; --navmut:#87A0A8;
+    --amber:#E5A13A; --amber-tint:#FBF2DF; --amber-ink:#8A5A12; --amber-line:#EFD3A2;
+    --ok:#2F7D5B; --ok-tint:#E4F1EA; --err:#BC4238; --err-tint:#F9E9E7;
+    --r:10px; --r-sm:8px;
+    --shadow:0 1px 2px rgba(23,39,48,.05), 0 8px 24px rgba(23,39,48,.06);
+    --sans:"Inter",-apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--petrol-mid);outline-offset:2px;border-radius:4px}
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{width:236px;min-width:236px;background:var(--nav);color:var(--navtext);display:flex;flex-direction:column;padding:18px 12px 14px}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+  .brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--petrol),var(--petrol-mid));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff}
+  .brand-name{font-weight:600;font-size:15px;letter-spacing:.01em;color:#fff}
+  .brand-sub{font-family:var(--mono);font-size:10px;color:var(--navmut);margin-top:1px}
+  .nav-label{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--navmut);padding:14px 10px 6px}
+  .nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;color:var(--navtext);font-size:13px;text-align:left;position:relative}
+  .nav-item svg{width:16px;height:16px;flex:none;opacity:.75}
+  .nav-item:hover{background:rgba(255,255,255,.05)}
+  .nav-item.active{background:var(--nav2);color:#fff;font-weight:600}
+  .nav-item.active::before{content:"";position:absolute;left:-12px;top:6px;bottom:6px;width:3px;border-radius:0 3px 3px 0;background:var(--petrol-mid)}
+  .nav-item.active svg{opacity:1}
+  .sidebar-foot{margin-top:auto;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 12px}
+  .foot-line{display:flex;align-items:center;gap:7px;font-size:11.5px}
+  .dot{width:7px;height:7px;border-radius:50%;background:#4CC38A;flex:none}
+  .foot-sub{font-family:var(--mono);font-size:10px;color:var(--navmut);margin-top:4px}
+
+  /* ---------- Main ---------- */
+  .main{flex:1;overflow-y:auto;position:relative}
+  .content{max-width:1020px;margin:0 auto;padding:30px 36px 60px}
+  .screen{display:none}
+  .screen.visible{display:block}
+  .page-head{margin-bottom:20px}
+  .page-head h1{font-size:21px;font-weight:600;letter-spacing:-.01em}
+  .page-sub{color:var(--ink2);font-size:12.5px;margin-top:3px}
+  .head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+
+  .btn{display:inline-flex;align-items:center;gap:7px;border-radius:var(--r-sm);padding:8px 14px;font-size:13px;font-weight:600}
+  .btn svg{width:15px;height:15px}
+  .btn-primary{background:var(--petrol);color:#fff}
+  .btn-primary:hover{background:var(--petrol-strong)}
+  .btn-ghost{color:var(--petrol);background:var(--petrol-tint)}
+  .btn-ghost:hover{background:#d6e6e9}
+  .btn-plain{color:var(--ink2);padding:8px 10px}
+  .btn-plain:hover{color:var(--ink);background:var(--line2);border-radius:8px}
+  .btn[disabled]{opacity:.45;cursor:not-allowed}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2.5px 9px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .chip-ok{background:var(--ok-tint);color:var(--ok)}
+  .chip-err{background:var(--err-tint);color:var(--err)}
+  .chip-petrol{background:var(--petrol-tint);color:var(--petrol)}
+  .chip-neutral{background:var(--line2);color:var(--ink2)}
+  .badge-lang{font-family:var(--mono);font-size:10.5px;font-weight:600;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink2);background:var(--surface)}
+  .mono{font-family:var(--mono);font-size:11.5px;color:var(--ink2)}
+
+  /* ---------- Onboarding ---------- */
+  #scr-onboarding .content{max-width:660px;padding-top:60px}
+  .onb-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--petrol);margin-bottom:10px}
+  .onb h1{font-size:26px;font-weight:600;letter-spacing:-.015em;margin-bottom:8px}
+  .onb-lead{color:var(--ink2);font-size:14px;max-width:480px;margin-bottom:28px}
+  .steps{display:flex;flex-direction:column;gap:0;margin-bottom:28px}
+  .step{display:flex;gap:16px;position:relative;padding-bottom:22px}
+  .step:last-child{padding-bottom:0}
+  .step::before{content:"";position:absolute;left:15px;top:34px;bottom:2px;width:2px;background:var(--line)}
+  .step:last-child::before{display:none}
+  .step-n{width:32px;height:32px;border-radius:50%;background:var(--petrol-tint);color:var(--petrol);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none;border:1px solid #cfe0e3}
+  .step-t{font-weight:600;font-size:14px;padding-top:5px}
+  .step-d{color:var(--ink2);font-size:12.5px;margin-top:2px}
+  .onb-actions{display:flex;align-items:center;gap:18px;margin-bottom:22px}
+  .link{color:var(--petrol);font-weight:600;font-size:13px;text-decoration:none}
+  .link:hover{text-decoration:underline}
+  .onb-note{font-family:var(--mono);font-size:11px;color:var(--ink3)}
+
+  /* ---------- Ricerca ---------- */
+  .search-row{display:flex;gap:10px;margin-bottom:14px}
+  .search-box{flex:1;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0 14px;box-shadow:var(--shadow)}
+  .search-box svg{width:17px;height:17px;color:var(--ink3);flex:none}
+  .search-box input{flex:1;border:none;background:none;font:inherit;font-size:14px;padding:12px 0;color:var(--ink)}
+  .search-box input:focus{outline:none}
+  .filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .f-label{font-size:11.5px;color:var(--ink3);font-weight:600;margin-left:4px}
+  .f-chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:600;color:var(--ink2)}
+  .f-chip:hover{border-color:var(--ink3)}
+  .f-chip.on{background:var(--petrol);border-color:var(--petrol);color:#fff}
+  .results{display:flex;flex-direction:column;gap:10px}
+  .result{padding:15px 18px;text-align:left;width:100%;display:block;transition:border-color .12s}
+  .result:hover{border-color:var(--petrol-mid)}
+  .res-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+  .res-title{font-weight:600;font-size:14px;color:var(--ink)}
+  .res-snip{color:var(--ink2);font-size:12.5px;margin-bottom:7px}
+  .res-snip b{color:var(--ink);background:var(--amber-tint);border-radius:3px;padding:0 2px;font-weight:600}
+  .res-meta{display:flex;align-items:center;gap:10px}
+  .rel{display:inline-flex;gap:3px;margin-left:auto}
+  .rel i{width:5px;height:5px;border-radius:50%;background:var(--line)}
+  .rel i.f{background:var(--petrol-mid)}
+
+  /* ---------- Chat ---------- */
+  #scr-chat .content{display:flex;flex-direction:column;height:100%;padding-bottom:24px}
+  .thread{flex:1;display:flex;flex-direction:column;gap:14px;padding:4px 2px 18px;overflow-y:auto}
+  .msg-user{align-self:flex-end;max-width:70%;background:var(--petrol);color:#fff;border-radius:14px 14px 4px 14px;padding:10px 15px;font-size:13.5px}
+  .msg-ai{align-self:flex-start;max-width:82%;padding:14px 17px}
+  .msg-ai p{font-size:13.5px}
+  .cite{display:inline-flex;align-items:center;gap:5px;background:var(--amber-tint);border:1px solid var(--amber-line);color:var(--amber-ink);border-radius:999px;padding:1px 8px 1px 3px;font-size:11px;font-weight:700;vertical-align:2px;margin:0 1px}
+  .cite:hover{background:#f6e6c6}
+  .balloon{width:16px;height:16px;border-radius:50%;background:var(--amber);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none}
+  .src-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--ink3);margin:12px 0 7px}
+  .src-list{display:flex;flex-direction:column;gap:6px}
+  .src-item{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;text-align:left;width:100%;background:var(--surface)}
+  .src-item:hover{border-color:var(--amber);background:var(--amber-tint)}
+  .src-doc{font-weight:600;font-size:12.5px}
+  .src-meta{font-family:var(--mono);font-size:10.5px;color:var(--ink2)}
+  .msg-refusal{border-left:3px solid var(--ink3)}
+  .msg-refusal .ref-t{font-weight:700;font-size:13px;margin-bottom:3px}
+  .msg-refusal p{color:var(--ink2)}
+  .typing{align-self:flex-start;color:var(--ink3);font-size:12px;padding:6px 4px;display:none}
+  .composer{display:flex;gap:10px;border-top:1px solid var(--line);padding-top:16px}
+  .composer .search-box{box-shadow:none}
+  .send{width:42px;height:42px;border-radius:var(--r-sm);background:var(--petrol);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+  .send:hover{background:var(--petrol-strong)}
+  .send svg{width:16px;height:16px}
+
+  /* ---------- Viewer ---------- */
+  .viewer-top{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .viewer-title{font-weight:600;font-size:15px}
+  .viewer-body{display:flex;gap:18px;align-items:flex-start}
+  .thumbs{display:flex;flex-direction:column;gap:8px;flex:none}
+  .thumb{width:64px;height:84px;background:var(--surface);border:1px solid var(--line);border-radius:6px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;font-family:var(--mono);font-size:9.5px;color:var(--ink3)}
+  .thumb.on{border-color:var(--petrol);box-shadow:0 0 0 2px var(--petrol-tint)}
+  .pagecard{flex:1;padding:44px 52px;position:relative;max-width:680px}
+  .runhead{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--ink3);display:flex;justify-content:space-between;margin-bottom:26px}
+  .pagecard h2{font-size:17px;font-weight:700;margin-bottom:14px}
+  .pagecard p{font-size:12.8px;color:#33454e;margin-bottom:13px;line-height:1.65}
+  .hl{position:relative;background:var(--amber-tint);border-left:3px solid var(--amber);border-radius:0 6px 6px 0;padding:10px 12px 10px 14px;margin:0 -14px 13px}
+  .hl .balloon{position:absolute;left:-32px;top:10px;width:20px;height:20px;font-size:11px}
+  .hl-cap{font-family:var(--mono);font-size:10px;color:var(--amber-ink);margin-top:6px}
+  .figbox{border:1px dashed var(--line);border-radius:8px;padding:14px;display:flex;align-items:center;gap:18px;margin-bottom:13px}
+  .figdots{display:grid;grid-template-columns:repeat(2,22px);gap:8px 26px}
+  .fd{width:20px;height:20px;border-radius:50%;border:2px solid var(--ink3);color:var(--ink2);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .figcap{font-family:var(--mono);font-size:10.5px;color:var(--ink2)}
+
+  /* ---------- Tables ---------- */
+  table{width:100%;border-collapse:collapse}
+  th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);text-align:left;font-weight:600;padding:12px 16px;border-bottom:1px solid var(--line)}
+  td{padding:13px 16px;border-bottom:1px solid var(--line2);font-size:13px;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .cell-main{font-weight:600}
+  .cell-sub{font-family:var(--mono);font-size:11px;color:var(--ink2);margin-top:2px}
+  .row-off .cell-main,.row-off td{color:var(--ink3)}
+  .toggle{width:34px;height:19px;border-radius:999px;background:var(--ok);position:relative;flex:none}
+  .toggle::after{content:"";position:absolute;top:2.5px;left:17px;width:14px;height:14px;border-radius:50%;background:#fff}
+  .toggle.off{background:#C9D3D8}
+  .toggle.off::after{left:3px}
+  .progress{height:5px;border-radius:999px;background:var(--line2);overflow:hidden;width:120px;margin-top:6px}
+  .progress i{display:block;height:100%;background:var(--petrol-mid);border-radius:999px;width:64%}
+  .err-line{color:var(--err);font-size:11.5px;margin-top:2px}
+  .act-link{color:var(--petrol);font-weight:600;font-size:12px}
+  .act-link:hover{text-decoration:underline}
+
+  /* ---------- Stat cards ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+  .stat{padding:14px 16px}
+  .stat-n{font-size:21px;font-weight:700;letter-spacing:-.01em}
+  .stat-n.red{color:var(--err)}
+  .stat-l{font-size:11.5px;color:var(--ink2);margin-top:1px}
+  .stat .progress{width:100%;margin-top:9px}
+  .stat .progress i{background:var(--petrol)}
+
+  /* ---------- Modals & toast ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(20,38,45,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .overlay.open{display:flex}
+  .modal{width:100%;max-width:480px;padding:22px 24px}
+  .modal h3{font-size:16px;font-weight:600;margin-bottom:4px}
+  .modal-sub{color:var(--ink2);font-size:12.5px;margin-bottom:16px}
+  .src-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .src-opt{border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left;font-weight:600;font-size:12.5px;background:var(--surface)}
+  .src-opt small{display:block;font-weight:500;color:var(--ink3);font-size:11px;margin-top:1px}
+  .src-opt.sel{border-color:var(--petrol);background:var(--petrol-tint)}
+  .src-opt[disabled]{opacity:.5}
+  .field label{display:block;font-size:11.5px;font-weight:600;color:var(--ink2);margin-bottom:5px}
+  .field input,.field select{width:100%;border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px;font:inherit;font-size:13px;background:var(--surface);color:var(--ink)}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--petrol-mid)}
+  .field .mono-in{font-family:var(--mono);font-size:12px}
+  .field{margin-bottom:13px}
+  .checks{display:flex;gap:14px;flex-wrap:wrap}
+  .checks label{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--ink);margin:0}
+  .modal-note{font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-bottom:16px}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);background:var(--nav);color:#fff;border-radius:10px;padding:11px 16px;font-size:12.5px;display:flex;align-items:center;gap:12px;box-shadow:0 10px 30px rgba(20,38,45,.35);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:60}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  .toast .act-link{color:#8FD3DD}
+
+  @media (max-width:900px){
+    .sidebar{width:64px;min-width:64px;padding:14px 8px}
+    .brand-name,.brand-sub,.nav-label,.nav-item span,.sidebar-foot{display:none}
+    .nav-item{justify-content:center}
+    .content{padding:22px 18px 50px}
+    .stats{grid-template-columns:1fr 1fr}
+    .thumbs{display:none}
+    .pagecard{padding:26px 22px}
+    .hl .balloon{position:static;margin-right:6px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= SIDEBAR ================= -->
+  <nav class="sidebar" aria-label="Navigazione principale">
+    <div class="brand">
+      <div class="brand-mark">R</div>
+      <div>
+        <div class="brand-name">Radix</div>
+        <div class="brand-sub">on-premise · mock v1</div>
+      </div>
+    </div>
+
+    <div class="nav-label">Consultazione</div>
+    <button class="nav-item" data-nav="ricerca" onclick="go('ricerca')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span>Ricerca</span>
+    </button>
+    <button class="nav-item" data-nav="chat" onclick="go('chat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></svg>
+      <span>Chat</span>
+    </button>
+
+    <div class="nav-label">Amministrazione</div>
+    <button class="nav-item" data-nav="fonti" onclick="go('fonti')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span>Fonti</span>
+    </button>
+    <button class="nav-item" data-nav="coda" onclick="go('coda')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+      <span>Indicizzazione</span>
+    </button>
+    <button class="nav-item" data-nav="utenti" onclick="go('utenti')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5a5 5 0 0 1 6 4.9"/></svg>
+      <span>Utenti</span>
+    </button>
+
+    <div class="nav-label">Setup</div>
+    <button class="nav-item" data-nav="onboarding" onclick="go('onboarding')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/></svg>
+      <span>Prima attivazione</span>
+    </button>
+
+    <div class="sidebar-foot">
+      <div class="foot-line"><span class="dot"></span>Tutti i dati sul tuo server</div>
+      <div class="foot-sub">nessuna connessione esterna</div>
+    </div>
+  </nav>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+
+    <!-- ========== ONBOARDING ========== -->
+    <section class="screen onb" id="scr-onboarding">
+      <div class="content">
+        <div class="onb-eyebrow">PRIMA CONFIGURAZIONE</div>
+        <h1>Benvenuto in Radix</h1>
+        <p class="onb-lead">Tre passaggi e la documentazione tecnica della tua azienda diventa interrogabile. Tutto resta sul tuo server.</p>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-n">1</div>
+            <div>
+              <div class="step-t">Collega una fonte</div>
+              <div class="step-d">Cartella di rete, cartella locale o caricamento diretto dei file.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-n">2</div>
+            <div>
+              <div class="step-t">Indicizzazione automatica</div>
+              <div class="step-d">Parsing, OCR e indice multilingua, senza alcun intervento manuale.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-n">3</div>
+            <div>
+              <div class="step-t">Fai la prima domanda</div>
+              <div class="step-d">Risposte con citazioni alla pagina esatta del documento originale.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="onb-actions">
+          <button class="btn btn-primary" onclick="go('fonti');openModal('modal-fonte')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Collega la prima fonte
+          </button>
+          <a href="#" class="link" onclick="go('ricerca');return false;">Esplora la demo con dati di esempio →</a>
+        </div>
+        <div class="onb-note">installazione locale · attivazione stimata: meno di una giornata</div>
+      </div>
+    </section>
+
+    <!-- ========== RICERCA ========== -->
+    <section class="screen" id="scr-ricerca">
+      <div class="content">
+        <div class="page-head">
+          <h1>Ricerca</h1>
+          <div class="page-sub">12.482 documenti indicizzati · 3 lingue · aggiornato 2 minuti fa</div>
+        </div>
+
+        <div class="search-row">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="q" type="text" value="coppia di serraggio testata RS-30" aria-label="Cerca nella documentazione">
+          </div>
+          <button class="btn btn-primary" onclick="fakeSearch()">Cerca</button>
+        </div>
+
+        <div class="filters">
+          <span class="f-label">Lingua</span>
+          <button class="f-chip on" onclick="pick(this)">Tutte</button>
+          <button class="f-chip" onclick="pick(this)">IT</button>
+          <button class="f-chip" onclick="pick(this)">EN</button>
+          <button class="f-chip" onclick="pick(this)">DE</button>
+          <span class="f-label">Tipo</span>
+          <button class="f-chip on" onclick="pick(this)">Tutti</button>
+          <button class="f-chip" onclick="pick(this)">Manuali</button>
+          <button class="f-chip" onclick="pick(this)">Schede</button>
+          <button class="f-chip" onclick="pick(this)">Bollettini</button>
+        </div>
+
+        <div class="results" id="results">
+          <button class="card result" onclick="openViewer('ricerca')">
+            <div class="res-top">
+              <span class="res-title">Compressore rotativo RS-30 — Instruction manual</span>
+              <span class="badge-lang">EN</span><span class="chip chip-neutral">Manuale</span>
+              <span class="rel" title="Rilevanza alta"><i class="f"></i><i class="f"></i><i class="f"></i></span>
+            </div>
+            <div class="res-snip">…cylinder head bolts must be tightened to <b>85 Nm</b> following the cross pattern shown in fig. 6.4. The <b>tightening sequence</b> is performed in three steps with a calibrated torque wrench…</div>
+            <div class="res-meta"><span class="mono">pag. 142</span><span class="mono">\\srv\documentazione-tecnica\compressori</span></div>
+          </button>
+
+          <button class="card result" onclick="openViewer('ricerca')">
+            <div class="res-top">
+              <span class="res-title">Bollettino di manutenzione — Serie RS</span>
+              <span class="badge-lang">IT</span><span class="chip chip-neutral">Bollettino</span>
+              <span class="rel" title="Rilevanza alta"><i class="f"></i><i class="f"></i><i></i></span>
+            </div>
+            <div class="res-snip">…verifica della <b>coppia di serraggio</b> dopo le prime 50 ore di esercizio. Per la <b>testata</b> utilizzare esclusivamente chiave dinamometrica tarata e certificata…</div>
+            <div class="res-meta"><span class="mono">pag. 8</span><span class="mono">\\srv\documentazione-tecnica\bollettini</span></div>
+          </button>
+
+          <button class="card result" onclick="openViewer('ricerca')">
+            <div class="res-top">
+              <span class="res-title">Wartungshandbuch — Presse HP-200</span>
+              <span class="badge-lang">DE</span><span class="chip chip-neutral">Manuale</span>
+              <span class="rel" title="Rilevanza media"><i class="f"></i><i class="f"></i><i></i></span>
+            </div>
+            <div class="res-snip">…Anzugsmoment der Zylinderkopfschrauben gemäß Tabelle 4 in drei Stufen anziehen. Kalibrierten <b>Drehmomentschlüssel</b> verwenden…</div>
+            <div class="res-meta"><span class="mono">pag. 33</span><span class="mono">\\srv\documentazione-tecnica\presse</span></div>
+          </button>
+
+          <button class="card result" onclick="openViewer('ricerca')">
+            <div class="res-top">
+              <span class="res-title">Linea di confezionamento L12 — Manuale operatore</span>
+              <span class="badge-lang">IT</span><span class="chip chip-neutral">Manuale</span>
+              <span class="rel" title="Rilevanza bassa"><i class="f"></i><i></i><i></i></span>
+            </div>
+            <div class="res-snip">…serraggio dei gruppi di traino: valori riportati in tabella 9. Le indicazioni non sono applicabili alla serie RS…</div>
+            <div class="res-meta"><span class="mono">pag. 61</span><span class="mono">\\srv\documentazione-tecnica\linee</span></div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== CHAT ========== -->
+    <section class="screen" id="scr-chat">
+      <div class="content">
+        <div class="page-head">
+          <h1>Chat</h1>
+          <div class="page-sub">Risposte basate esclusivamente sui documenti indicizzati, con citazione alla pagina</div>
+        </div>
+
+        <div class="thread" id="thread">
+          <div class="msg-user">Qual è la coppia di serraggio per i bulloni della testata dell'RS-30?</div>
+
+          <div class="card msg-ai">
+            <p>Per la testata del compressore RS-30 la coppia di serraggio prescritta è <strong>85 Nm</strong>, da applicare in sequenza a croce in tre passaggi: 30, 60 e infine 85 Nm
+              <button class="cite" onclick="openViewer('chat')"><span class="balloon">1</span>pag. 142</button>.
+              Il costruttore richiede inoltre la verifica del serraggio dopo le prime 50 ore di esercizio
+              <button class="cite" onclick="openViewer('chat')"><span class="balloon">2</span>pag. 8</button>.
+            </p>
+            <div class="src-label">FONTI</div>
+            <div class="src-list">
+              <button class="src-item" onclick="openViewer('chat')">
+                <span class="balloon">1</span>
+                <span class="src-doc">Compressore rotativo RS-30 — Instruction manual</span>
+                <span class="src-meta">EN · pag. 142</span>
+              </button>
+              <button class="src-item" onclick="openViewer('chat')">
+                <span class="balloon">2</span>
+                <span class="src-doc">Bollettino di manutenzione — Serie RS</span>
+                <span class="src-meta">IT · pag. 8</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="msg-user">E per il modello RS-55?</div>
+
+          <div class="card msg-ai msg-refusal">
+            <div class="ref-t">Non presente nella documentazione indicizzata</div>
+            <p>Nessun documento caricato copre il modello RS-55. Se disponi del manuale, puoi aggiungerlo dalla sezione <a href="#" class="link" onclick="go('fonti');return false;">Fonti</a>.</p>
+          </div>
+        </div>
+
+        <div class="typing" id="typing">Radix sta cercando nei documenti…</div>
+
+        <div class="composer">
+          <div class="search-box">
+            <input id="chat-in" type="text" placeholder="Fai una domanda sulla documentazione…" aria-label="Scrivi una domanda">
+          </div>
+          <button class="send" onclick="sendMsg()" aria-label="Invia">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== VISUALIZZATORE ========== -->
+    <section class="screen" id="scr-viewer">
+      <div class="content">
+        <div class="viewer-top">
+          <button class="btn btn-plain" id="back-btn" onclick="goBack()">← Torna alla chat</button>
+          <span class="viewer-title">Compressore rotativo RS-30 — Instruction manual</span>
+          <span class="badge-lang">EN</span>
+          <span class="mono">pag. 142 di 384</span>
+        </div>
+
+        <div class="viewer-body">
+          <div class="thumbs" aria-hidden="true">
+            <div class="thumb">140</div>
+            <div class="thumb">141</div>
+            <div class="thumb on">142</div>
+            <div class="thumb">143</div>
+            <div class="thumb">144</div>
+          </div>
+
+          <div class="card pagecard">
+            <div class="runhead"><span>RS-30 INSTRUCTION MANUAL</span><span>SECTION 6 · MAINTENANCE</span></div>
+            <h2>6.4 Cylinder head — tightening sequence</h2>
+            <p>Before reassembly, make sure that the mating surfaces of the cylinder head and the crankcase are clean and free from residues of the previous gasket. Always fit a new head gasket; never reuse a compressed gasket.</p>
+
+            <div class="hl">
+              <span class="balloon">1</span>
+              <p style="margin:0">Tighten the cylinder head bolts to a final torque of <strong>85 Nm</strong>, following the cross pattern shown in fig. 6.4. Apply the torque in three steps — 30 Nm, 60 Nm and 85 Nm — using a calibrated torque wrench only.</p>
+              <div class="hl-cap">passaggio citato nella risposta · ①</div>
+            </div>
+
+            <div class="figbox">
+              <div class="figdots">
+                <span class="fd">1</span><span class="fd">3</span>
+                <span class="fd">4</span><span class="fd">2</span>
+              </div>
+              <span class="figcap">fig. 6.4 — cross tightening pattern</span>
+            </div>
+
+            <p>After the first 50 hours of operation, re-check the tightening torque as described in the maintenance bulletin for the RS series. Record the check in the maintenance log.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== FONTI ========== -->
+    <section class="screen" id="scr-fonti">
+      <div class="content">
+        <div class="page-head head-row">
+          <div>
+            <h1>Fonti</h1>
+            <div class="page-sub">Da dove Radix acquisisce i documenti. Le fonti attive sono monitorate in automatico.</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('modal-fonte')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Aggiungi fonte
+          </button>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead><tr><th>Fonte</th><th>Percorso</th><th>Documenti</th><th>Stato</th><th></th></tr></thead>
+            <tbody id="fonti-body">
+              <tr>
+                <td><div class="cell-main">Cartella di rete (SMB)</div></td>
+                <td><span class="mono">\\srv\documentazione-tecnica</span></td>
+                <td>12.268</td>
+                <td><span class="chip chip-ok">Sincronizzata · 10 min fa</span></td>
+                <td><button class="toggle" onclick="this.classList.toggle('off')" aria-label="Attiva o disattiva fonte"></button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-main">Caricamenti manuali</div></td>
+                <td><span class="mono">repository locale</span></td>
+                <td>214</td>
+                <td><span class="chip chip-ok">Attiva</span></td>
+                <td><button class="toggle" onclick="this.classList.toggle('off')" aria-label="Attiva o disattiva fonte"></button></td>
+              </tr>
+              <tr class="row-off">
+                <td><div class="cell-main">Google Drive</div></td>
+                <td><span class="mono">—</span></td>
+                <td>—</td>
+                <td><span class="chip chip-neutral">Disponibile nella v1.1</span></td>
+                <td><button class="act-link" disabled>Collega</button></td>
+              </tr>
+              <tr class="row-off">
+                <td><div class="cell-main">SharePoint</div></td>
+                <td><span class="mono">—</span></td>
+                <td>—</td>
+                <td><span class="chip chip-neutral">Disponibile nella v1.1</span></td>
+                <td><button class="act-link" disabled>Collega</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== INDICIZZAZIONE ========== -->
+    <section class="screen" id="scr-coda">
+      <div class="content">
+        <div class="page-head">
+          <h1>Indicizzazione</h1>
+          <div class="page-sub">Stato della pipeline: parsing, OCR, embedding e indice. Rilevamento automatico delle modifiche.</div>
+        </div>
+
+        <div class="stats">
+          <div class="card stat"><div class="stat-n">12.482</div><div class="stat-l">Documenti indicizzati</div></div>
+          <div class="card stat"><div class="stat-n">148 <span style="font-size:12px;color:var(--ink3)">/ 500 GB</span></div><div class="stat-l">Spazio utilizzato</div><div class="progress"><i style="width:29.6%"></i></div></div>
+          <div class="card stat"><div class="stat-n" id="stat-coda">36</div><div class="stat-l">In coda</div></div>
+          <div class="card stat"><div class="stat-n red" id="stat-err">3</div><div class="stat-l">Errori</div></div>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead><tr><th>Documento</th><th>Fonte</th><th>Stato</th><th>Aggiornato</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="mono" style="color:var(--ink)">RS-30_instruction_manual.pdf</span></td>
+                <td class="mono">documentazione-tecnica</td>
+                <td><span class="chip chip-ok">Indicizzato</span></td>
+                <td class="mono">2 min fa</td>
+              </tr>
+              <tr>
+                <td><span class="mono" style="color:var(--ink)">L12_manuale_operatore.pdf</span></td>
+                <td class="mono">documentazione-tecnica</td>
+                <td><span class="chip chip-petrol" id="ocr-chip">OCR in corso</span><div class="progress"><i id="ocr-bar" style="width:64%"></i></div></td>
+                <td class="mono">adesso</td>
+              </tr>
+              <tr>
+                <td><span class="mono" style="color:var(--ink)">HP-200_wartungshandbuch.pdf</span></td>
+                <td class="mono">documentazione-tecnica</td>
+                <td><span class="chip chip-neutral">In coda</span></td>
+                <td class="mono">—</td>
+              </tr>
+              <tr>
+                <td><span class="mono" style="color:var(--ink)">catalogo_ricambi_2024.pdf</span></td>
+                <td class="mono">caricamenti manuali</td>
+                <td><span class="chip chip-neutral">In coda</span></td>
+                <td class="mono">—</td>
+              </tr>
+              <tr id="row-err">
+                <td><span class="mono" style="color:var(--ink)">formulazione_EP-204.pdf</span></td>
+                <td class="mono">caricamenti manuali</td>
+                <td>
+                  <span class="chip chip-err">Errore</span>
+                  <div class="err-line">PDF protetto da password — <button class="act-link" onclick="excludeDoc()">Escludi</button></div>
+                </td>
+                <td class="mono">1 h fa</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mono" style="margin-top:12px">indicizzazione incrementale attiva — le modifiche ai file vengono rilevate automaticamente</p>
+      </div>
+    </section>
+
+    <!-- ========== UTENTI ========== -->
+    <section class="screen" id="scr-utenti">
+      <div class="content">
+        <div class="page-head head-row">
+          <div>
+            <h1>Utenti</h1>
+            <div class="page-sub">Chi può accedere e a quali collezioni. Massimo 20 utenti per installazione.</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('modal-invito')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Invita utente
+          </button>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead><tr><th>Nome</th><th>Ruolo</th><th>Collezioni</th><th>Stato</th></tr></thead>
+            <tbody id="utenti-body">
+              <tr>
+                <td><div class="cell-main">Laura Bianchi</div><div class="cell-sub">laura.bianchi@meccanica-vr.it</div></td>
+                <td><span class="chip chip-petrol">Admin</span></td>
+                <td>Tutte le collezioni</td>
+                <td><span class="chip chip-ok">Attivo</span></td>
+              </tr>
+              <tr>
+                <td><div class="cell-main">Marco Ferri</div><div class="cell-sub">m.ferri@meccanica-vr.it</div></td>
+                <td><span class="chip chip-neutral">Utente</span></td>
+                <td>Manuali · Qualità</td>
+                <td><span class="chip chip-ok">Attivo</span></td>
+              </tr>
+              <tr>
+                <td><div class="cell-main">Studio Rossi — IT esterno</div><div class="cell-sub">assistenza@studiorossi.it</div></td>
+                <td><span class="chip chip-petrol">Admin</span></td>
+                <td>Tutte le collezioni</td>
+                <td><span class="chip chip-ok">Attivo</span></td>
+              </tr>
+              <tr>
+                <td><div class="cell-main">Giulia Sala</div><div class="cell-sub">g.sala@meccanica-vr.it</div></td>
+                <td><span class="chip chip-neutral">Utente</span></td>
+                <td>Manuali</td>
+                <td><span class="chip chip-neutral">Invito inviato</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ========== MODALE: AGGIUNGI FONTE ========== -->
+<div class="overlay" id="modal-fonte" onclick="if(event.target===this)closeModal('modal-fonte')">
+  <div class="card modal" role="dialog" aria-modal="true" aria-labelledby="mf-title">
+    <h3 id="mf-title">Aggiungi fonte</h3>
+    <div class="modal-sub">La fonte verrà indicizzata automaticamente. Nessun file lascia il server.</div>
+
+    <div class="src-opts">
+      <button class="src-opt sel" onclick="selOpt(this)">Cartella di rete<small>SMB / share aziendale</small></button>
+      <button class="src-opt" onclick="selOpt(this)">Cartella locale<small>sul server Radix</small></button>
+      <button class="src-opt" onclick="selOpt(this)">Caricamento file<small>upload manuale</small></button>
+      <button class="src-opt" disabled>Google Drive · SharePoint<small>disponibili nella v1.1</small></button>
+    </div>
+
+    <div class="field">
+      <label for="path">Percorso</label>
+      <input id="path" class="mono-in" type="text" value="\\srv\qualita\procedure">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-plain" onclick="closeModal('modal-fonte')">Annulla</button>
+      <button class="btn btn-primary" onclick="addFonte()">Collega fonte</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODALE: INVITA UTENTE ========== -->
+<div class="overlay" id="modal-invito" onclick="if(event.target===this)closeModal('modal-invito')">
+  <div class="card modal" role="dialog" aria-modal="true" aria-labelledby="mi-title">
+    <h3 id="mi-title">Invita utente</h3>
+    <div class="modal-sub">L'utente riceverà un link di attivazione valido sulla rete aziendale.</div>
+
+    <div class="field">
+      <label for="inv-mail">Email</label>
+      <input id="inv-mail" type="text" placeholder="nome.cognome@azienda.it">
+    </div>
+    <div class="field">
+      <label for="inv-role">Ruolo</label>
+      <select id="inv-role"><option>Utente</option><option>Admin</option></select>
+    </div>
+    <div class="field">
+      <label>Collezioni accessibili</label>
+      <div class="checks">
+        <label><input type="checkbox" checked> Manuali</label>
+        <label><input type="checkbox"> Qualità</label>
+        <label><input type="checkbox"> Formulazioni</label>
+      </div>
+    </div>
+    <div class="modal-note">i permessi si applicano a ricerca, chat e visualizzatore</div>
+
+    <div class="modal-actions">
+      <button class="btn btn-plain" onclick="closeModal('modal-invito')">Annulla</button>
+      <button class="btn btn-primary" onclick="addUser()">Invia invito</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TOAST ========== -->
+<div class="toast" id="toast" role="status"><span id="toast-msg"></span><button class="act-link" id="toast-act" style="display:none">Vedi coda →</button></div>
+
+<script>
+  /* ---------- Navigazione ---------- */
+  var viewerFrom = 'chat';
+  function go(name){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('visible'); });
+    document.getElementById('scr-'+name).classList.add('visible');
+    document.querySelectorAll('.nav-item').forEach(function(n){
+      n.classList.toggle('active', n.getAttribute('data-nav')===name);
+    });
+    document.querySelector('.main').scrollTop = 0;
+  }
+  function openViewer(from){
+    viewerFrom = from;
+    document.getElementById('back-btn').textContent = (from==='chat') ? '← Torna alla chat' : '← Torna ai risultati';
+    go('viewer');
+  }
+  function goBack(){ go(viewerFrom); }
+
+  /* ---------- Ricerca ---------- */
+  function pick(el){
+    var group = el.parentNode;
+    var prev = el.previousElementSibling;
+    // toggle within the group delimited by .f-label
+    var sib = el;
+    while(sib.previousElementSibling && !sib.previousElementSibling.classList.contains('f-label')){ sib = sib.previousElementSibling; }
+    var node = sib;
+    while(node && !node.classList.contains('f-label')){
+      if(node.classList.contains('f-chip')) node.classList.remove('on');
+      node = node.nextElementSibling;
+    }
+    el.classList.add('on');
+  }
+  function fakeSearch(){
+    var r = document.getElementById('results');
+    r.style.opacity = .35;
+    setTimeout(function(){ r.style.opacity = 1; }, 350);
+  }
+  document.getElementById('q').addEventListener('keydown', function(e){ if(e.key==='Enter') fakeSearch(); });
+
+  /* ---------- Chat ---------- */
+  function sendMsg(){
+    var input = document.getElementById('chat-in');
+    var text = input.value.trim();
+    if(!text) return;
+    var thread = document.getElementById('thread');
+
+    var u = document.createElement('div');
+    u.className = 'msg-user';
+    u.textContent = text;
+    thread.appendChild(u);
+    input.value = '';
+
+    var typing = document.getElementById('typing');
+    typing.style.display = 'block';
+    thread.scrollTop = thread.scrollHeight;
+
+    setTimeout(function(){
+      typing.style.display = 'none';
+      var ai = document.createElement('div');
+      if(/55/.test(text)){
+        ai.className = 'card msg-ai msg-refusal';
+        ai.innerHTML = '<div class="ref-t">Non presente nella documentazione indicizzata</div><p>Nessun documento caricato copre questo argomento. Puoi aggiungere la documentazione dalla sezione Fonti.</p>';
+      } else {
+        ai.className = 'card msg-ai';
+        ai.innerHTML = '<p><em>Risposta simulata nel mock</em> — nel prodotto qui comparirebbe la risposta generata dai documenti, con le citazioni alla pagina come nell\'esempio sopra.</p>';
+      }
+      thread.appendChild(ai);
+      thread.scrollTop = thread.scrollHeight;
+    }, 900);
+  }
+  document.getElementById('chat-in').addEventListener('keydown', function(e){ if(e.key==='Enter') sendMsg(); });
+
+  /* ---------- Modali ---------- */
+  function openModal(id){ document.getElementById(id).classList.add('open'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape') document.querySelectorAll('.overlay.open').forEach(function(o){ o.classList.remove('open'); });
+  });
+  function selOpt(el){
+    el.parentNode.querySelectorAll('.src-opt').forEach(function(o){ o.classList.remove('sel'); });
+    el.classList.add('sel');
+  }
+
+  /* ---------- Fonti ---------- */
+  function addFonte(){
+    var path = document.getElementById('path').value || '\\\\srv\\qualita\\procedure';
+    var tb = document.getElementById('fonti-body');
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td><div class="cell-main">Cartella di rete (SMB)</div></td>'+
+      '<td><span class="mono"></span></td>'+
+      '<td>—</td>'+
+      '<td><span class="chip chip-petrol">Sincronizzazione iniziale…</span></td>'+
+      '<td><button class="toggle" onclick="this.classList.toggle(\'off\')" aria-label="Attiva o disattiva fonte"></button></td>';
+    tr.querySelector('.mono').textContent = path;
+    tb.insertBefore(tr, tb.firstElementChild);
+    closeModal('modal-fonte');
+    showToast('Fonte collegata — indicizzazione avviata', true);
+  }
+
+  /* ---------- Indicizzazione ---------- */
+  function excludeDoc(){
+    var row = document.getElementById('row-err');
+    if(row) row.remove();
+    var s = document.getElementById('stat-err');
+    s.textContent = Math.max(0, parseInt(s.textContent,10)-1);
+    showToast('Documento escluso dall\'indicizzazione', false);
+  }
+  // barra OCR che avanza (solo estetica)
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!reduced){
+    var pct = 64;
+    var iv = setInterval(function(){
+      pct += 2;
+      var bar = document.getElementById('ocr-bar');
+      if(!bar){ clearInterval(iv); return; }
+      bar.style.width = pct + '%';
+      if(pct >= 100){
+        clearInterval(iv);
+        var chip = document.getElementById('ocr-chip');
+        chip.className = 'chip chip-ok';
+        chip.textContent = 'Indicizzato';
+        bar.parentNode.remove();
+        var c = document.getElementById('stat-coda');
+        c.textContent = Math.max(0, parseInt(c.textContent,10)-1);
+      }
+    }, 700);
+  }
+
+  /* ---------- Utenti ---------- */
+  function addUser(){
+    var mail = document.getElementById('inv-mail').value.trim() || 'nuovo.utente@azienda.it';
+    var role = document.getElementById('inv-role').value;
+    var name = mail.split('@')[0].split('.').map(function(p){ return p.charAt(0).toUpperCase()+p.slice(1); }).join(' ');
+    var tb = document.getElementById('utenti-body');
+    var tr = document.createElement('tr');
+    var roleChip = (role==='Admin') ? 'chip-petrol' : 'chip-neutral';
+    tr.innerHTML = '<td><div class="cell-main"></div><div class="cell-sub"></div></td>'+
+      '<td><span class="chip '+roleChip+'">'+role+'</span></td>'+
+      '<td>Manuali</td>'+
+      '<td><span class="chip chip-neutral">Invito inviato</span></td>';
+    tr.querySelector('.cell-main').textContent = name;
+    tr.querySelector('.cell-sub').textContent = mail;
+    tb.appendChild(tr);
+    closeModal('modal-invito');
+    showToast('Invito inviato a ' + mail, false);
+  }
+
+  /* ---------- Toast ---------- */
+  var toastTimer = null;
+  function showToast(msg, withLink){
+    var t = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    var act = document.getElementById('toast-act');
+    act.style.display = withLink ? 'inline' : 'none';
+    act.onclick = function(){ go('coda'); t.classList.remove('show'); };
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 4200);
+  }
+
+  /* ---------- Avvio ---------- */
+  go('onboarding');
+</script>
+</body>
+</html>

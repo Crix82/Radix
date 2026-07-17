@@ -1,0 +1,3 @@
+# Eval set for the RAG harness (SPEC §11, M4): at least 10 questions with expected
+# document and page. Populated in M4 together with eval/run_eval.py.
+questions: []

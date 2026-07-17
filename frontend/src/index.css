@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible {
+    outline: 2px solid theme("colors.petrol.mid");
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-line rounded shadow-card;
+  }
+  .btn {
+    @apply inline-flex items-center gap-[7px] rounded-sm px-[14px] py-2 text-[13px] font-semibold;
+  }
+  .btn-primary {
+    @apply btn bg-petrol text-white hover:bg-petrol-strong;
+  }
+  .field-label {
+    @apply block text-[11.5px] font-semibold text-ink2 mb-[5px];
+  }
+  .field-input {
+    @apply w-full border border-line rounded-sm px-[11px] py-[9px] text-[13px] bg-surface text-ink focus:outline-none focus:border-petrol-mid;
+  }
+}

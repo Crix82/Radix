@@ -1,0 +1,58 @@
+# Dev override: hot reload for api and frontend, plus the local Ollama service (GPU).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up  (see Makefile)
+services:
+  api:
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      DEBUG: "true"
+      LLM_BASE_URL: http://ollama:11434/v1
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/worker:/app/worker
+      - ./backend/migrations:/app/migrations
+    ports:
+      - "8000:8000"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  worker:
+    environment:
+      LLM_BASE_URL: http://ollama:11434/v1
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/worker:/app/worker
+
+  frontend-dev:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund && npm run dev"
+    environment:
+      VITE_API_PROXY: http://api:8000
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-./data}/models:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Requires the NVIDIA container toolkit; comment out on machines without GPU.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -1,0 +1,15 @@
+# Radix reverse proxy — HTTPS with internal (self-signed) certificate by default.
+# For a customer certificate, replace `tls internal` with `tls /certs/cert.pem /certs/key.pem`.
+{$RADIX_DOMAIN:localhost} {
+	tls internal
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}
