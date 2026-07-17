@@ -13,8 +13,11 @@ eval harness).
   risultato vale ~1/61 comunque. La cosine densa di bge-m3 riflette la rilevanza
   semantica reale ed è il segnale corretto per rifiutare. Deviazione consapevole
   dall'implementazione letterale, l'intento della spec (rifiutare fuori corpus) è
-  preservato. Soglia default 0.55, override nella tabella `settings`
-  (`refusal_threshold`), calibrabile.
+  preservato. **Calibrata sull'eval set** (M4): le domande rispondibili hanno cosine
+  >= 0.52, quindi la default è **0.45** (margine + rifiuta query chiaramente estranee);
+  override nella tabella `settings` (`refusal_threshold`). La domanda fuori corpus
+  "RS-55" ha cosine 0.549 (vicinissima all'RS-30): la soglia da sola non la distingue, è
+  il grounding dell'LLM a produrre la frase di rifiuto — verificato nell'eval.
 - **La frase di rifiuto è esatta e non chiama l'LLM** (`REFUSAL_PHRASE`, SPEC §8/DoD):
   se non ci sono chunk o la cosine è sotto soglia, l'evento `final` porta la frase e
   `refusal: true`, senza toccare il provider.

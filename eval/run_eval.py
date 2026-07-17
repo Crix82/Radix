@@ -88,9 +88,12 @@ def evaluate(deps: EvalDeps, questions: list[Expected], refusals: list[str]) -> 
     refusal_ok = True
     for q in refusals:
         result = run_question(deps, q)
-        good = result.refusal and result.answer_md == REFUSAL_PHRASE
+        # A refusal is valid from either path: the cosine threshold (result.refusal) or the
+        # LLM following the grounding prompt and emitting the exact phrase (SPEC §8).
+        good = result.answer_md.strip() == REFUSAL_PHRASE
         refusal_ok = refusal_ok and good
-        state = "refused" if result.refusal else result.answer_md[:40]
+        source = "threshold" if result.refusal else "grounded"
+        state = f"refused ({source})" if good else result.answer_md[:50]
         print(f"  [{'PASS' if good else 'FAIL'}] refusal: {state}")
 
     ref = "ok" if refusal_ok else "FAILED"

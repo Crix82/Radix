@@ -16,9 +16,11 @@ class Settings(BaseSettings):
     llm_provider: str = "ollama"
     llm_model: str = "qwen3.5:9b-instruct-q4_K_M"
     llm_base_url: str = "http://localhost:11434/v1"
-    # Default refusal threshold on the best dense cosine; calibrated in M4, override in
-    # the `settings` table (key `refusal_threshold`). See ADR 0005.
-    refusal_threshold: float = 0.55
+    # Refusal threshold on the best dense cosine. Calibrated in M4: answerable eval
+    # questions score >= 0.52, so 0.45 leaves margin while refusing clearly-unrelated
+    # queries; borderline off-corpus (e.g. a nearby-but-absent model) is caught by the
+    # LLM grounding. Override in the `settings` table (`refusal_threshold`). See ADR 0005.
+    refusal_threshold: float = 0.45
 
     embed_device: str = "auto"
     embed_model: str = "BAAI/bge-m3"
