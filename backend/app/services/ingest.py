@@ -34,6 +34,7 @@ class SyncResult:
     removed: int = 0
     unchanged: int = 0
     document_ids: list[int] = field(default_factory=list)
+    removed_document_ids: list[int] = field(default_factory=list)
 
 
 def file_sha256(path: Path) -> str:
@@ -144,8 +145,9 @@ def sync_source(db: Session, source: Source) -> SyncResult:
     )
     now = datetime.now(UTC)
     for doc in stale:
-        doc.deleted_at = now  # tombstone; M3 also drops the Qdrant points
+        doc.deleted_at = now  # tombstone; the worker drops the Qdrant points (SPEC §5)
         result.removed += 1
+        result.removed_document_ids.append(doc.id)
 
     source.last_sync_at = now
     source.status = "ok"

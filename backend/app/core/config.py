@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     app_name: str = "Radix"
     debug: bool = False
 
-    database_url: str = "postgresql+psycopg://radix:radix@localhost:5432/radix"
+    database_url: str = "postgresql+pg8000://radix:radix@localhost:5432/radix"
     redis_url: str = "redis://localhost:6379/0"
     qdrant_url: str = "http://localhost:6333"
 
@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:11434/v1"
 
     embed_device: str = "auto"
+    embed_model: str = "BAAI/bge-m3"
+    embed_dim: int = 1024
+    qdrant_collection: str = "chunks"
     ocr_langs: str = "ita+eng+deu"
     sync_interval_min: int = 5
     data_dir: str = "./data"

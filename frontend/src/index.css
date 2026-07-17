@@ -71,4 +71,29 @@
   tbody tr:last-child .td {
     @apply border-b-0;
   }
+  /* Search screen (mock: .search-box, .f-chip, .result, .badge-lang, .rel) */
+  .search-box {
+    @apply flex flex-1 items-center gap-[10px] rounded border border-line bg-surface px-[14px] shadow-card;
+  }
+  .search-box input {
+    @apply flex-1 border-none bg-transparent py-3 text-[14px] text-ink placeholder:text-ink3 focus:outline-none;
+  }
+  .f-label {
+    @apply ml-1 text-[11.5px] font-semibold text-ink3;
+  }
+  .f-chip {
+    @apply rounded-full border border-line bg-surface px-3 py-1 text-[12px] font-semibold text-ink2 hover:border-ink3;
+  }
+  .f-chip-on {
+    @apply f-chip border-petrol bg-petrol text-white hover:border-petrol;
+  }
+  .result {
+    @apply block w-full rounded border border-line bg-surface px-[18px] py-[15px] text-left shadow-card transition-colors hover:border-petrol-mid;
+  }
+  .badge-lang {
+    @apply rounded-[5px] border border-line bg-surface px-[6px] py-px font-mono text-[10.5px] font-semibold text-ink2;
+  }
+  .res-snip b {
+    @apply rounded-[3px] bg-amber-tint px-[2px] font-semibold text-ink;
+  }
 }

@@ -90,6 +90,22 @@ class QueueItemOut(BaseModel):
     updated_at: datetime
 
 
+class SearchDocumentRef(BaseModel):
+    id: int
+    title: str | None
+    lang: str | None
+    doc_type: str | None
+    rel_path: str
+
+
+class SearchResultOut(BaseModel):
+    chunk_id: int
+    document: SearchDocumentRef
+    page: int
+    snippet_html: str
+    score: float
+
+
 class ComponentHealth(BaseModel):
     status: str  # "ok" | "error"
     detail: str | None = None

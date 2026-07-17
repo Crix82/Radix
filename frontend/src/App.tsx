@@ -6,6 +6,7 @@ import { IndexingPage } from "./pages/IndexingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { SearchPage } from "./pages/SearchPage";
 import { SourcesPage } from "./pages/SourcesPage";
 
 export function App() {
@@ -14,16 +15,7 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/search" replace />} />
-        <Route
-          path="/search"
-          element={
-            <PlaceholderPage
-              title={t.pages.search.title}
-              subtitle={t.pages.search.subtitle}
-              note={t.pages.search.placeholder}
-            />
-          }
-        />
+        <Route path="/search" element={<SearchPage />} />
         <Route
           path="/chat"
           element={

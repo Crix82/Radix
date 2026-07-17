@@ -19,3 +19,7 @@ def enqueue_sync_source(source_id: int) -> None:
 
 def enqueue_parse_document(document_id: int) -> None:
     get_queue().enqueue("worker.jobs.parse_document", document_id)
+
+
+def enqueue_embed_chunks(document_id: int) -> None:
+    get_queue().enqueue("worker.jobs.embed_chunks", document_id)

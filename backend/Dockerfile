@@ -20,9 +20,10 @@ COPY alembic.ini ./
 
 RUN pip install --no-cache-dir .
 
-# Pre-fetch Docling layout/table models at build time so runtime makes no external
-# calls (SPEC §9). Models are baked into the image cache.
+# Pre-fetch the models at build time so runtime makes no external calls (SPEC §9):
+# Docling layout/table models and the bge-m3 embedding model, baked into the image cache.
 RUN docling-tools models download
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
 
 EXPOSE 8000
 

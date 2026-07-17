@@ -38,8 +38,13 @@ lint:
 	cd frontend && npm run typecheck
 
 licenses:  ## fail on any non-permissive license (SPEC §14)
-	cd backend && .venv/bin/pip-licenses --fail-on="AGPL;AGPLv3;GPL;GPLv2;GPLv3;LGPL;SSPL;BUSL" \
-		--ignore-packages radix-backend pip-licenses prettytable wcwidth
+	# --partial-match so "GPL" also catches "LGPL-3.0-only", "AGPL-3.0", "GPL-2.0", etc.
+	# NVIDIA CUDA runtime libs (pulled by torch) are proprietary but redistributable for
+	# commercial use under the CUDA EULA (SPEC §14 forbids only non-commercial) — allowlisted here.
+	cd backend && .venv/bin/pip-licenses --partial-match \
+		--fail-on="AGPL;GPL;SSPL;BUSL;CC-BY-NC;Commons-Clause;Elastic;Proprietary" \
+		--ignore-packages radix-backend pip-licenses prettytable wcwidth \
+		$$(.venv/bin/pip list --format=freeze | sed -n 's/^\(nvidia-[^=]*\)==.*/\1/p' | tr '\n' ' ')
 	cd frontend && npx license-checker --production --summary \
 		--excludePackages "radix-frontend@0.1.0" \
 		--failOn "AGPL;AGPL-3.0;GPL;GPL-2.0;GPL-3.0;LGPL;SSPL;BUSL-1.1"

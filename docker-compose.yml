@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-radix}:${POSTGRES_PASSWORD:-radix}@postgres:5432/${POSTGRES_DB:-radix}
+      DATABASE_URL: postgresql+pg8000://${POSTGRES_USER:-radix}:${POSTGRES_PASSWORD:-radix}@postgres:5432/${POSTGRES_DB:-radix}
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       DATA_DIR: /data
@@ -59,7 +59,7 @@ services:
     command: python -m worker.main
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-radix}:${POSTGRES_PASSWORD:-radix}@postgres:5432/${POSTGRES_DB:-radix}
+      DATABASE_URL: postgresql+pg8000://${POSTGRES_USER:-radix}:${POSTGRES_PASSWORD:-radix}@postgres:5432/${POSTGRES_DB:-radix}
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       DATA_DIR: /data
