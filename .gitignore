@@ -14,6 +14,9 @@ frontend/dist/
 # Runtime data (postgres, qdrant, repository, pagecache, models)
 data/
 
+# Backup archives (deploy/backup.sh)
+backups/
+
 # Env & secrets
 .env
 

@@ -1,0 +1,15 @@
+# GPU override for the bundled Ollama runtime.
+# Applied automatically by deploy/install.sh when it detects the NVIDIA Container Toolkit
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.llm.yml:docker-compose.gpu.yml
+# Enable by hand with:
+#   docker compose -f docker-compose.yml -f docker-compose.llm.yml -f docker-compose.gpu.yml up -d
+# Requires the NVIDIA Container Toolkit on the host; layer it only on GPU hosts.
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

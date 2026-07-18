@@ -1,0 +1,15 @@
+# Bundled LLM runtime (LLM_RUNTIME=bundled). Layered onto the base stack via
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.llm.yml   (set by deploy/install.sh)
+# CPU by default (SPEC §10 "Cliente entry"); add docker-compose.gpu.yml for a GPU.
+# With LLM_RUNTIME=external this file is left out and api/worker talk to LLM_BASE_URL.
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR:-./data}/models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
