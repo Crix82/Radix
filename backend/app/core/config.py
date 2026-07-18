@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
 
     llm_provider: str = "ollama"
-    llm_model: str = "qwen3.5:9b-instruct-q4_K_M"
+    llm_model: str = "qwen3.5:9b-q4_K_M"
     llm_base_url: str = "http://localhost:11434/v1"
     # Refusal threshold on the best dense cosine. Calibrated in M4: answerable eval
     # questions score >= 0.52, so 0.45 leaves margin while refusing clearly-unrelated

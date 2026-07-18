@@ -42,7 +42,9 @@ ok "database restored"
 if [[ -f "$STAGE/qdrant.snapshot" ]]; then
   info "Restoring Qdrant collection '${QDRANT_COLLECTION}'…"
   dc cp "$STAGE/qdrant.snapshot" "qdrant:/qdrant/snapshots/_restore.snapshot"
-  dc exec -T api python -c "
+  # api/worker are stopped above to keep writes off the restore, so run the recovery from a
+  # throwaway api container (it has qdrant-client and reaches qdrant:6333) rather than `exec`.
+  dc run --rm --no-deps -T api python -c "
 from qdrant_client import QdrantClient
 c = QdrantClient(url='http://qdrant:6333', timeout=600)
 c.recover_snapshot(collection_name='${QDRANT_COLLECTION}', location='file:///qdrant/snapshots/_restore.snapshot')
@@ -55,8 +57,19 @@ fi
 # --- 3. Repository -----------------------------------------------------------
 if [[ -f "$STAGE/repository.tar.gz" ]]; then
   info "Restoring repository…"
-  rm -rf "${DATA_DIR:?}/repository"
-  tar -xzf "$STAGE/repository.tar.gz" -C "$DATA_DIR"
+  # Repository files are written by the root api/worker container, so on hosts where the
+  # invoking user isn't root they aren't ours to delete. Swap them from a throwaway container
+  # (root, with the repository volume mounted) using only the Python stdlib the image ships.
+  dc run --rm --no-deps -T api python -c "
+import os, shutil, sys, tarfile
+root = '/data/repository'
+os.makedirs(root, exist_ok=True)
+for name in os.listdir(root):
+    path = os.path.join(root, name)
+    shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
+with tarfile.open(fileobj=sys.stdin.buffer, mode='r:gz') as tar:
+    tar.extractall('/data', filter='data')
+" < "$STAGE/repository.tar.gz"
   ok "repository restored"
 fi
 

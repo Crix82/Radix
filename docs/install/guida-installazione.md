@@ -67,7 +67,7 @@ commenti: `.env.example`. Campi principali:
 | `POSTGRES_PASSWORD`, `JWT_SECRET` | segreti, generati automaticamente |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | admin creato al primo avvio (solo se non esistono utenti) |
 | `LLM_RUNTIME` | `bundled` (Ollama nello stack) o `external` (endpoint gestito fuori) |
-| `LLM_MODEL` | tag del modello (es. `qwen3.5:9b-instruct-q4_K_M`) |
+| `LLM_MODEL` | tag del modello (es. `qwen3.5:9b-q4_K_M`) |
 | `LLM_BASE_URL` | endpoint OpenAI-compatibile (per `external`) |
 | `COMPOSE_FILE` | assemblaggio dello stack — **gestito dall'installer**, vedi sotto |
 
