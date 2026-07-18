@@ -14,6 +14,9 @@ from app.services.llm.base import LLMProvider
 
 
 class OpenAICompatibleProvider(LLMProvider):
+    # Provider-specific keys merged into every request payload (see OllamaProvider).
+    extra_payload: dict[str, Any] = {}
+
     def __init__(self, base_url: str, model: str, timeout: float = 120.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -27,6 +30,7 @@ class OpenAICompatibleProvider(LLMProvider):
             "messages": messages,
             "stream": stream,
             "temperature": 0.1,  # grounded, low-variance answers
+            **self.extra_payload,
         }
         if json_schema is not None:
             payload["response_format"] = {

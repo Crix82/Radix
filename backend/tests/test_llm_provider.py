@@ -107,3 +107,13 @@ def test_json_schema_sets_response_format() -> None:
         [{"role": "user", "content": "x"}], stream=False, json_schema={"type": "object"}
     )
     assert payload["response_format"]["type"] == "json_schema"
+
+
+def test_ollama_disables_reasoning_but_vllm_does_not() -> None:
+    # Qwen3.5 on Ollama is a reasoning model; without this it burns hidden thinking tokens and
+    # intermittently returns empty content (which surfaces as a spurious refusal).
+    msgs = [{"role": "user", "content": "x"}]
+    ollama = OllamaProvider(base_url="http://x/v1", model="m")._payload(msgs, False, None)
+    assert ollama["reasoning_effort"] == "none"
+    vllm = VLLMProvider(base_url="http://x/v1", model="m")._payload(msgs, False, None)
+    assert "reasoning_effort" not in vllm
