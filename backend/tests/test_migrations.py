@@ -30,4 +30,4 @@ def test_initial_migration_emits_full_schema() -> None:
         assert f"CREATE TABLE {table}" in sql, f"missing table {table}"
     assert "GENERATED ALWAYS AS" in sql  # chunks.tsv computed column
     assert "USING gin" in sql  # GIN index on chunks.tsv
-    assert "regconfig" in sql  # per-language FTS config
+    assert "to_tsvector('simple'" in sql  # language-agnostic FTS config

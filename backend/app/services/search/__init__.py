@@ -13,15 +13,15 @@ from sqlalchemy.sql.elements import BindParameter
 
 from app.services import vectorstore
 from app.services.embeddings import Embedder
-from app.services.parsing.lang import detect_language
 from app.services.search.fusion import rrf_fuse
 from app.services.search.snippet import make_snippet
 
 TOP_PER_RETRIEVER = 24
 DEFAULT_LIMIT = 20
 
-# Query language → Postgres FTS config (mirrors chunks.tsv, SPEC §4.1).
-_REGCONFIG = {"it": "italian", "en": "english", "de": "german"}
+# FTS runs on the 'simple' config on both sides — see CHUNK_TSV_EXPRESSION in models/tables.py
+# for why (index and query configs must match; per-language stemming is unreliable here).
+FTS_REGCONFIG = "simple"
 
 
 @dataclass
@@ -35,10 +35,6 @@ class SearchResult:
     page: int
     snippet_html: str
     score: float
-
-
-def query_regconfig(query: str) -> str:
-    return _REGCONFIG.get(detect_language(query), "simple")
 
 
 def fts_search(
@@ -59,7 +55,7 @@ def fts_search(
         "d.status = 'indexed'",
         "c.tsv @@ websearch_to_tsquery(CAST(:cfg AS regconfig), :q)",
     ]
-    params: dict[str, object] = {"cfg": query_regconfig(query), "q": query, "limit": limit}
+    params: dict[str, object] = {"cfg": FTS_REGCONFIG, "q": query, "limit": limit}
     binds: list[BindParameter[object]] = []
     if allowed_collection_ids is not None:
         conditions.append("d.collection_id IN :colls")

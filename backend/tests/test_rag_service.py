@@ -82,6 +82,62 @@ def test_retrieve_hydrates_context(corpus, db_session, monkeypatch) -> None:
     assert r.chunks[0].bboxes == {"8": [[0.1, 0.1, 0.5, 0.2]]}
 
 
+@pytest.fixture
+def invoice_doc(db_session: Session) -> list[int]:
+    """One document split into three chunks in reading order (monotonic ids): payee header,
+    the total line, then notes — the invoice-style case where a fact straddles chunks."""
+    create_sqlite_chunks_table(db_session.get_bind())
+    col = Collection(name="Fatture")
+    db_session.add(col)
+    db_session.flush()
+    src = Source(type=SourceType.local, path="/f", collection_id=col.id)
+    db_session.add(src)
+    db_session.flush()
+    doc = Document(
+        source_id=src.id,
+        collection_id=col.id,
+        rel_path="fattura.pdf",
+        title="Fattura",
+        content_hash="fattura".ljust(64, "0"),
+        status=DocumentStatus.indexed,
+        lang="it",
+    )
+    db_session.add(doc)
+    db_session.flush()
+    ids: list[int] = []
+    for page, txt in [
+        (1, "GERUNDA, CRISTIANO - C.F. GRNCST82D20B563N"),
+        (1, "Fattura Numero 5 - TOTALE 8.790,95 (EUR)"),
+        (2, "Condizioni di pagamento a 30 giorni."),
+    ]:
+        ch = Chunk(document_id=doc.id, page_start=page, page_end=page, text=txt, lang="it")
+        db_session.add(ch)
+        db_session.flush()
+        ids.append(ch.id)
+    db_session.commit()
+    return ids
+
+
+def test_retrieve_expands_to_neighbors(invoice_doc, db_session, monkeypatch) -> None:
+    header, total, _notes = invoice_doc
+    # Only the payee-header chunk is retrieved; the amount lives in the next chunk.
+    _wire(monkeypatch, dense=[(header, 0.61)], fts=[])
+    r = rag.retrieve(db_session, FakeEmbedder(), object(), "importo fattura gerunda", None)
+    assert [c.chunk_id for c in r.chunks] == [header, total]  # ±1 neighbour brings in the total
+    assert [c.n for c in r.chunks] == [1, 2]
+    assert any("8.790,95" in c.text for c in r.chunks)
+
+
+def test_neighbor_expansion_dedupes_shared_neighbor(invoice_doc, db_session, monkeypatch) -> None:
+    header, total, notes = invoice_doc
+    # header's window is [header, total]; notes' window is [total, notes] — total is shared.
+    _wire(monkeypatch, dense=[(header, 0.6), (notes, 0.5)], fts=[])
+    r = rag.retrieve(db_session, FakeEmbedder(), object(), "q", None)
+    got = [c.chunk_id for c in r.chunks]
+    assert got == [header, total, notes]
+    assert len(got) == len(set(got))  # the shared neighbour appears once
+
+
 def test_answer_stream_refuses_below_threshold(corpus, db_session, monkeypatch) -> None:
     _wire(monkeypatch, dense=[(corpus["boll"], 0.30)], fts=[])
     provider = FakeProvider(["should not be called"])

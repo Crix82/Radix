@@ -1,4 +1,3 @@
-from app.services.search import query_regconfig
 from app.services.search.fusion import rrf_fuse
 from app.services.search.snippet import make_snippet
 
@@ -55,11 +54,3 @@ def test_snippet_ignore_short_terms() -> None:
     html = make_snippet("a e i o u parola", "a e parola")
     assert "<b>parola</b>" in html
     assert "<b>a</b>" not in html  # 1-char terms dropped
-
-
-def test_query_regconfig_maps_languages() -> None:
-    assert query_regconfig("La coppia di serraggio della testata") == "italian"
-    assert query_regconfig("what is the torque for the cylinder head bolts") == "english"
-    assert query_regconfig("wie ist das Anzugsmoment der Schrauben in der Tabelle") == "german"
-    # keyword-only queries carry no function words -> simple (dense retrieval still handles them)
-    assert query_regconfig("RS-30 12345") == "simple"

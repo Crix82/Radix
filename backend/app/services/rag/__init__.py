@@ -25,6 +25,11 @@ from app.services.search.fusion import rrf_fuse
 
 TOP_CONTEXT = 8
 MAX_CONTEXT_TOKENS = 3500
+# When a chunk is retrieved, also pull this many chunks on each side of it within the same
+# document. Retrieval matches a single chunk, but a fact can straddle a chunk boundary (an
+# invoice's payee header and its total line land in adjacent chunks); the neighbours carry the
+# rest of the fact into the LLM context. See _expand_with_neighbors.
+NEIGHBOR_RADIUS = 1
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")
 
 
@@ -86,6 +91,54 @@ class ChatResult:
     refusal: bool = False
 
 
+def _expand_with_neighbors(
+    db: Session, ordered_ids: list[int], radius: int = NEIGHBOR_RADIUS
+) -> list[int]:
+    """Grow the selected chunk ids with their same-document neighbours (adjacent in chunk-id
+    order — ids are monotonic within a document, see worker/jobs.py). Fusion order is kept:
+    each anchor is emitted with its window of neighbours, de-duplicated. Neighbours share the
+    anchor's document (hence its collection), so this surfaces no chunk the caller wasn't
+    already permitted to retrieve."""
+    if radius <= 0 or not ordered_ids:
+        return ordered_ids
+    doc_of: dict[int, int] = {
+        cid: did
+        for cid, did in db.execute(
+            text("SELECT id, document_id FROM chunks WHERE id IN :ids").bindparams(
+                bindparam("ids", expanding=True)
+            ),
+            {"ids": ordered_ids},
+        )
+    }
+    doc_ids = list(dict.fromkeys(doc_of.values()))
+    if not doc_ids:
+        return ordered_ids
+    order: dict[int, list[int]] = {}
+    for cid, did in db.execute(
+        text(
+            "SELECT id, document_id FROM chunks WHERE document_id IN :docs ORDER BY document_id, id"
+        ).bindparams(bindparam("docs", expanding=True)),
+        {"docs": doc_ids},
+    ):
+        order.setdefault(did, []).append(cid)
+    position = {did: {cid: i for i, cid in enumerate(ids)} for did, ids in order.items()}
+
+    expanded: list[int] = []
+    seen: set[int] = set()
+    for anchor in ordered_ids:
+        did = doc_of.get(anchor)
+        if did is None:
+            window = [anchor]
+        else:
+            i = position[did][anchor]
+            window = order[did][max(0, i - radius) : i + radius + 1]
+        for cid in window:
+            if cid not in seen:
+                seen.add(cid)
+                expanded.append(cid)
+    return expanded
+
+
 def retrieve(
     db: Session,
     embedder: Embedder,
@@ -114,6 +167,7 @@ def retrieve(
     if not fused_ids:
         return Retrieval(chunks=[], max_dense_score=max_dense)
 
+    context_ids = _expand_with_neighbors(db, fused_ids)
     rows = db.execute(
         text(
             """
@@ -122,13 +176,13 @@ def retrieve(
             WHERE c.id IN :ids AND d.deleted_at IS NULL AND d.status = 'indexed'
             """
         ).bindparams(bindparam("ids", expanding=True)),
-        {"ids": fused_ids},
+        {"ids": context_ids},
     ).all()
     by_id = {row[0]: row for row in rows}
 
     chunks: list[ContextChunk] = []
     tokens = 0
-    for chunk_id in fused_ids:
+    for chunk_id in context_ids:
         row = by_id.get(chunk_id)
         if row is None:
             continue

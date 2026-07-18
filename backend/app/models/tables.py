@@ -141,14 +141,13 @@ class Document(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-# FTS config per language, fallback 'simple' for anything else (see SPEC §4.1).
-CHUNK_TSV_EXPRESSION = (
-    "to_tsvector("
-    "CASE lang WHEN 'it' THEN 'italian'::regconfig "
-    "WHEN 'en' THEN 'english'::regconfig "
-    "WHEN 'de' THEN 'german'::regconfig "
-    "ELSE 'simple'::regconfig END, text)"
-)
+# FTS uses the language-agnostic 'simple' config on purpose (SPEC §4.1): a per-language
+# stemmer only helps when the query's detected language matches the chunk's, which is
+# unreliable on a multilingual corpus (an Italian invoice can be detected 'en', short queries
+# have no function words). 'simple' does exact lexeme matching — the right trade-off for the
+# terms lexical search must catch (invoice/part numbers, codes, names); the dense retriever
+# covers morphology. Both index and query side must use the SAME config or nothing matches.
+CHUNK_TSV_EXPRESSION = "to_tsvector('simple', text)"
 
 
 class Chunk(Base):
