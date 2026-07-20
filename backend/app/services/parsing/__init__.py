@@ -13,6 +13,7 @@ __all__ = [
     "detect_language",
     "get_parser",
     "probe_text_layer",
+    "warm_models",
 ]
 
 
@@ -21,3 +22,10 @@ def get_parser() -> DocumentParser:
     from app.services.parsing.docling_parser import DoclingParser
 
     return DoclingParser()
+
+
+def warm_models() -> None:
+    """Bake the Docling models into the image at build time (SPEC §9). Lazy import as above."""
+    from app.services.parsing.docling_parser import warm_models as _warm
+
+    _warm()

@@ -133,14 +133,14 @@ fi
 LLM_RUNTIME="$(ask LLM_RUNTIME 'LLM runtime — "bundled" (Ollama in-stack) or "external"' "${LLM_RUNTIME:-bundled}")"
 case "$LLM_RUNTIME" in
   bundled)
-    LLM_MODEL="$(ask LLM_MODEL 'Model tag to pull' "${LLM_MODEL:-qwen3.5:9b-instruct-q4_K_M}")"
+    LLM_MODEL="$(ask LLM_MODEL 'Model tag to pull' "${LLM_MODEL:-qwen3.5:9b-q4_K_M}")"
     LLM_BASE_URL="http://ollama:11434/v1"
     COMPOSE_FILE="docker-compose.yml:docker-compose.llm.yml"
     [[ "$GPU" -eq 1 ]] && COMPOSE_FILE="${COMPOSE_FILE}:docker-compose.gpu.yml"
     ;;
   external)
     LLM_BASE_URL="$(ask LLM_BASE_URL 'External OpenAI-compatible base URL' "${LLM_BASE_URL:-http://127.0.0.1:11434/v1}")"
-    LLM_MODEL="$(ask LLM_MODEL 'Model name exposed by that endpoint' "${LLM_MODEL:-qwen3.5:9b-instruct-q4_K_M}")"
+    LLM_MODEL="$(ask LLM_MODEL 'Model name exposed by that endpoint' "${LLM_MODEL:-qwen3.5:9b-q4_K_M}")"
     COMPOSE_FILE="docker-compose.yml"
     ;;
   *) die "LLM_RUNTIME must be 'bundled' or 'external' (got '$LLM_RUNTIME')" ;;

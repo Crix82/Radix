@@ -274,3 +274,27 @@ Regola: solo licenze permissive (Apache-2.0, MIT, BSD e simili). Vietate AGPL, S
   pulita e upgrade da `0003`). `make lint`, `make test` (166 test verdi, 1 `slow` skipped).
   Decisioni in
   `docs/adr/0008`.
+- 2026-07-20 · Robustezza di build e consegna (post-M6, emerso avviando lo stack per una prova
+  UI). Tre difetti, due dei quali facevano passare la DoD M6 senza che la garanzia fosse vera.
+  (1) **SPEC §9 non era rispettata**: `docling-tools models download` popola
+  `/root/.cache/docling/models`, ma a runtime `LayoutModel` risolve via `snapshot_download`
+  nella cache HuggingFace — l'immagine M6 spediva 1,3 GB nella cache sbagliata e scaricava
+  comunque il layout dall'Hub **al primo documento**, quindi su un cliente air-gapped
+  l'indicizzazione sarebbe fallita. Verificato con un parse di fixture sotto
+  `docker run --network none`: fallisce sull'immagine M6, passa ora. Correzione:
+  `app.services.parsing.warm_models()` scalda gli stessi converter del servizio, così scarica
+  per costruzione ciò che il runtime risolve; sparisce anche il download di rapidocr/easyocr
+  (mai usati: l'OCR è Tesseract) e con esso la dipendenza da `modelscope.cn` nel percorso di
+  ogni installazione. (2) **Il fix M6 del tag Ollama 404 aveva mancato `deploy/install.sh`**
+  (righe 136 e 143), cioè proprio il file che scrive il `.env` di un cliente nuovo: il wizard
+  proponeva ancora `qwen3.5:9b-instruct-q4_K_M` (HTTP 404 sul registry, verificato), `ollama
+  pull` falliva e l'installer si limitava a un `warn`. (3) **Dipendenze non pinnate**: tutti i
+  vincoli in `pyproject.toml` sono lower bound aperti, quindi l'immagine poteva cambiare tra la
+  verifica e l'installazione dal cliente — aggiunto `backend/requirements.lock` (156 pin dalla
+  risoluzione M6 verificata), installato con `--no-deps`, più `make lock` per rigenerarlo e un
+  cache mount BuildKit così un download corrotto non costringe a riscaricare 2,5 GB. Il
+  fallimento di build che ha innescato tutto è **transitorio** (tre tentativi: due falliti su
+  pacchetti diversi, uno riuscito), non un artefatto manomesso. Guardie in
+  `tests/test_deploy_consistency.py`; `deploy/` restava fuori dal gate ruff/mypy e nessun test
+  lo leggeva. `make lint`, `make test` (171 test verdi, 1 `slow` skipped). Decisioni in
+  `docs/adr/0009`.

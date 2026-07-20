@@ -29,6 +29,11 @@ source of truth for the UI. Work proceeds one milestone at a time (SPEC §11).
 
 ## Dependencies & licenses
 - **No new dependency without a license check**: run `make licenses` after adding one.
+- **`backend/requirements.lock` is what the image installs**, not `pyproject.toml`. The
+  `pyproject` entries are open lower bounds (`>=`) — an unconstrained resolve picks whatever is
+  newest that day, so the image would differ between a verification run and a customer install.
+  After changing `pyproject.toml`: `make lock` (resolves inside `python:3.12-slim`, the image's
+  own base), review the diff, then `make licenses`. See `docs/adr/0009`.
 - Only permissive licenses (Apache-2.0, MIT, BSD or equivalent). AGPL, SSPL, BUSL and
   non-commercial licenses are forbidden (SPEC §14). PyMuPDF is explicitly banned — use pypdfium2.
 

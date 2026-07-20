@@ -45,6 +45,24 @@ def _converter(ocr: bool) -> "DocumentConverter":
     )
 
 
+def warm_models() -> None:
+    """Force the model downloads the *runtime* path performs, so a build can bake them in.
+
+    SPEC §9 promises no external calls at runtime, but `docling-tools models download` populates
+    /root/.cache/docling/models while docling's LayoutModel resolves through snapshot_download
+    into the HuggingFace cache — different places. The M6 image parsed nothing under
+    `--network none` for exactly this reason: the layout model was fetched from the Hub on the
+    first document, so an air-gapped install broke on first use.
+
+    Building the same converters the service builds means whatever this pulls is, by
+    construction, what the runtime needs. Both OCR variants: they are cached separately.
+    """
+    from docling.datamodel.base_models import InputFormat
+
+    for ocr in (False, True):
+        _converter(ocr).initialize_pipeline(InputFormat.PDF)
+
+
 def _normalized_bbox(prov: Any, pages: dict[int, Any]) -> BBox | None:
     """Convert a Docling provenance bbox to normalized top-left coordinates (0..1)."""
     try:

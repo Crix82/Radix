@@ -25,6 +25,18 @@ venv:  ## create the backend virtualenv with dev dependencies
 	python3 -m venv backend/.venv
 	$(BACKEND_PY) -m pip install -q -e "backend/.[dev]"
 
+lock:  ## regenerate backend/requirements.lock from a clean resolve of pyproject.toml
+	# Resolved inside the image's own base (python:3.12-slim) so the pins match what the
+	# Dockerfile will install — a host resolve can differ (platform wheels, Python patch).
+	docker run --rm -v "$(PWD)/backend:/src" -w /src python:3.12-slim sh -c '\
+	  pip install -q --no-cache-dir . && \
+	  { echo "# Pinned production resolution for the api/worker image."; \
+	    echo "# Regenerate with \`make lock\`, then re-run \`make licenses\` (SPEC §14)."; \
+	    echo; \
+	    pip freeze --exclude-editable | grep -v "^radix-backend" | LC_ALL=C sort -f; \
+	  } > requirements.lock'
+	@echo "requirements.lock updated — review the diff before committing."
+
 test:  ## fast suite (SQLite, no Docling/torch)
 	cd backend && .venv/bin/python -m pytest -q -m "not slow"
 
