@@ -264,4 +264,12 @@ def answer_stream(
         yield "token", token
 
     answer = buffer.strip() or REFUSAL_PHRASE
+    # Retrieval cleared the threshold but the model found no answer in the context and emitted
+    # the refusal phrase itself. Without this branch it would be flagged as a normal answer and
+    # parse_citations' "no [n] markers" fallback would attach every context chunk as a source —
+    # a refusal rendered with a full Fonti panel. Same outcome as the threshold refusal above.
+    if answer == REFUSAL_PHRASE:
+        yield "final", ChatResult(answer_md=REFUSAL_PHRASE, citations=[], refusal=True)
+        return
+
     yield "final", ChatResult(answer_md=answer, citations=parse_citations(answer, retrieval.chunks))

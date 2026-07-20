@@ -202,6 +202,33 @@ def test_answer_stream_refuses_when_no_chunks(corpus, db_session, monkeypatch) -
     assert events[-1][1].refusal is True
 
 
+def test_answer_stream_flags_a_model_emitted_refusal(corpus, db_session, monkeypatch) -> None:
+    """Retrieval passes the threshold but the model itself says it has no answer.
+
+    Observed on the real stack: the turn was flagged refusal=False and parse_citations'
+    no-markers fallback attached all 16 context chunks, so a refusal rendered with a full
+    Fonti panel — and, once conversations are persisted, stayed that way in the history.
+    """
+    _wire(monkeypatch, dense=[(corpus["boll"], 0.9)], fts=[corpus["boll"]])
+    events = list(
+        rag.answer_stream(
+            db_session,
+            FakeEmbedder(),
+            object(),
+            FakeProvider(["Non presente nella ", "documentazione indicizzata."]),
+            [{"role": "user", "content": "domanda fuori contesto"}],
+            allowed_collection_ids=None,
+            refusal_threshold=0.55,
+        )
+    )
+    final = events[-1][1]
+    assert final.refusal is True
+    assert final.citations == []
+    assert final.answer_md == REFUSAL_PHRASE
+    # the tokens still streamed — the model was called, unlike a threshold refusal
+    assert [kind for kind, _ in events].count("token") == 2
+
+
 def test_answer_stream_empty_allowed_refuses(corpus, db_session, monkeypatch) -> None:
     _wire(monkeypatch, dense=[(corpus["boll"], 0.9)], fts=[corpus["boll"]])
     events = list(
