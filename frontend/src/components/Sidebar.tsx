@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 
 import { useCurrentUser, useLogout } from "../hooks/useAuth";
 import { t } from "../i18n";
+import { ConversationList } from "./ConversationList";
 
 const icons = {
   search: (
@@ -84,6 +85,7 @@ export function Sidebar() {
       <NavLabel>{t.nav.consultation}</NavLabel>
       <NavItem to="/search" icon={icons.search} label={t.nav.search} />
       <NavItem to="/chat" icon={icons.chat} label={t.nav.chat} />
+      <ConversationList isAdmin={user?.role === "admin"} />
 
       {user?.role === "admin" && (
         <>

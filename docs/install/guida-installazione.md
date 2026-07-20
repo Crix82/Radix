@@ -167,6 +167,23 @@ backup prima di un aggiornamento.**
 
 ---
 
+## 7bis. Conversazioni di chat — cosa viene conservato
+
+Le conversazioni di chat sono salvate sul database, per utente, e restano disponibili finché
+l'utente non le elimina (nessuna cancellazione automatica). Vengono incluse nel backup insieme
+al resto dei metadati, senza passaggi aggiuntivi.
+
+**Da comunicare agli utenti alla consegna:** un amministratore può consultare in sola lettura
+le conversazioni di *tutti* gli utenti. Serve a verificare cosa il sistema ha risposto, ma è a
+tutti gli effetti un accesso ai contenuti altrui: l'interfaccia lo dichiara sotto l'elenco delle
+conversazioni, e va detto esplicitamente in fase di formazione. Un amministratore **non** può
+eliminare le conversazioni degli altri — la cancellazione resta al proprietario.
+
+Separatamente, il registro di audit continua a tracciare che una chat è avvenuta, con l'utente e
+la domanda posta: è append-only e **non** viene rimosso dalla cancellazione di una conversazione.
+
+---
+
 ## 8. Troubleshooting
 
 - **`docker: permission denied`** — l'utente non è nel gruppo `docker`. Esegui

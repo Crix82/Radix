@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -20,7 +21,18 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.main import app
-from app.models import Base, User, UserRole, UserStatus
+from app.models import (
+    Base,
+    Chunk,
+    Collection,
+    Document,
+    DocumentStatus,
+    Source,
+    SourceType,
+    User,
+    UserRole,
+    UserStatus,
+)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # The 5 born-digital manuals used by the M1 ingest tests (excludes the M2 scanned fixture).
@@ -104,6 +116,83 @@ def plain_user(api_db: Session) -> User:
     user = _make_user(api_db, UserRole.user)
     app.dependency_overrides[get_current_user] = lambda: user
     return user
+
+
+class FakeProvider:
+    def __init__(self, tokens: list[str]) -> None:
+        self.tokens = tokens
+
+    def complete(self, messages, stream=True, json_schema=None) -> Iterator[str]:
+        yield from self.tokens
+
+
+class FakeEmbedder:
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0, 0.0, 0.0] for _ in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        return [0.0, 0.0, 0.0]
+
+
+def parse_sse(body: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in body.strip().split("\n\n"):
+        if not block.strip():
+            continue
+        event, data = None, None
+        for line in block.splitlines():
+            if line.startswith("event:"):
+                event = line[len("event:") :].strip()
+            elif line.startswith("data:"):
+                data = json.loads(line[len("data:") :].strip())
+        if event:
+            events.append((event, data))
+    return events
+
+
+def wire_chat(monkeypatch, dense, fts, tokens) -> None:
+    """Point the chat stack at canned retrieval results and a scripted LLM."""
+    monkeypatch.setattr("app.services.vectorstore.search", lambda *a, **k: list(dense))
+    monkeypatch.setattr("app.services.rag.fts_search", lambda *a, **k: list(fts))
+    monkeypatch.setattr("app.api.chat.get_llm_provider", lambda: FakeProvider(tokens))
+
+
+@pytest.fixture
+def chat_corpus(api_db: Session, monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    create_sqlite_chunks_table(api_db.get_bind())
+    # the streaming generator opens its own session — bind it to the same test engine
+    monkeypatch.setattr("app.api.chat.SessionLocal", sessionmaker(bind=api_db.get_bind()))
+    monkeypatch.setattr("app.api.chat.get_embedder", lambda: FakeEmbedder())
+    monkeypatch.setattr("app.api.chat.get_client", lambda: object())
+
+    col = Collection(name="C")
+    api_db.add(col)
+    api_db.flush()
+    src = Source(type=SourceType.local, path="/x", collection_id=col.id)
+    api_db.add(src)
+    api_db.flush()
+    doc = Document(
+        source_id=src.id,
+        collection_id=col.id,
+        rel_path="boll.pdf",
+        title="Bollettino RS",
+        content_hash="b" * 64,
+        status=DocumentStatus.indexed,
+        lang="it",
+    )
+    api_db.add(doc)
+    api_db.flush()
+    ch = Chunk(
+        document_id=doc.id,
+        page_start=8,
+        page_end=8,
+        lang="it",
+        bboxes={"8": [[0.1, 0.1, 0.5, 0.2]]},
+        text="Verifica della coppia di serraggio della testata.",
+    )
+    api_db.add(ch)
+    api_db.commit()
+    return {"chunk": ch.id, "doc": doc.id}
 
 
 @pytest.fixture

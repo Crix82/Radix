@@ -1,9 +1,11 @@
-import { Fragment, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import type { ChatFinal, Citation } from "../api/chat";
 import { streamChat } from "../api/chat";
+import type { ConversationMessage } from "../api/conversations";
 import { PageHead } from "../components/Layout";
+import { useConversation, useRefreshConversations } from "../hooks/useConversations";
 import { t } from "../i18n";
 
 const c = t.pages.chat;
@@ -80,12 +82,43 @@ function SourcesPanel({ citations, onCite }: { citations: Citation[]; onCite: (c
   );
 }
 
+function toMsg(stored: ConversationMessage): Msg {
+  if (stored.role === "user") return { role: "user", text: stored.content };
+  return {
+    role: "assistant",
+    text: stored.content,
+    citations: stored.citations,
+    refusal: stored.refusal,
+    streaming: false,
+  };
+}
+
 export function ChatPage() {
+  const { conversationId } = useParams<{ conversationId?: string }>();
+  const activeId = conversationId ? Number(conversationId) : undefined;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const navigate = useNavigate();
   const threadEndRef = useRef<HTMLDivElement>(null);
+  const stored = useConversation(activeId);
+  const refreshConversations = useRefreshConversations();
+  // Which thread the visible messages came from, so a refetch never clobbers a live stream.
+  const hydrated = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (activeId === undefined) {
+      if (hydrated.current !== undefined) {
+        hydrated.current = undefined;
+        setMessages([]);
+      }
+      return;
+    }
+    if (stored.data && hydrated.current !== stored.data.id) {
+      hydrated.current = stored.data.id;
+      setMessages(stored.data.messages.map(toMsg));
+    }
+  }, [activeId, stored.data]);
 
   const openCitation = (cit: Citation) => {
     navigate(`/viewer/${cit.document_id}/${cit.page}`, {
@@ -96,10 +129,8 @@ export function ChatPage() {
   const send = () => {
     const question = input.trim();
     if (!question || streaming) return;
-    const history = messages.map((m) =>
-      m.role === "user" ? { role: "user" as const, content: m.text } : { role: "assistant" as const, content: m.text },
-    );
-    const outgoing = [...history, { role: "user" as const, content: question }];
+    // Only the new question travels: the server replays the thread from what it stored.
+    const outgoing = [{ role: "user" as const, content: question }];
 
     setMessages((prev) => [
       ...prev,
@@ -121,6 +152,13 @@ export function ChatPage() {
       outgoing,
       {},
       {
+        onMeta: (meta) => {
+          if (activeId === undefined) {
+            // Adopt the thread the server just opened, without remounting the page.
+            hydrated.current = meta.conversation_id;
+            navigate(`/chat/${meta.conversation_id}`, { replace: true });
+          }
+        },
         onToken: (text) =>
           setMessages((prev) => {
             const next = [...prev];
@@ -137,12 +175,14 @@ export function ChatPage() {
             streaming: false,
           });
           setStreaming(false);
+          refreshConversations();
         },
         onError: () => {
           patchLast({ streaming: false, error: true, text: c.error });
           setStreaming(false);
         },
       },
+      activeId,
     ).finally(() => threadEndRef.current?.scrollIntoView({ behavior: "smooth" }));
   };
 

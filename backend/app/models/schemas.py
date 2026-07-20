@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, model_validator
 
@@ -165,6 +166,41 @@ class ChatFilters(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     filters: ChatFilters = ChatFilters()
+    # When set, the server replays this conversation's turns from the DB and ignores any prior
+    # turns in `messages` — the client must not be able to inject an arbitrary history.
+    conversation_id: int | None = None
+
+
+class CitationOut(BaseModel):
+    n: int
+    chunk_id: int
+    document_id: int
+    title: str | None
+    lang: str | None
+    page: int
+    bboxes: Any | None
+
+
+class ChatMessageOut(BaseModel):
+    id: int
+    role: str
+    content: str
+    citations: list[CitationOut] = []
+    refusal: bool
+    created_at: datetime
+
+
+class ConversationOut(BaseModel):
+    id: int
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    user_id: int
+    user_email: str | None = None
+
+
+class ConversationDetailOut(ConversationOut):
+    messages: list[ChatMessageOut]
 
 
 class ComponentHealth(BaseModel):

@@ -16,6 +16,13 @@ export const it = {
     indexing: "Indicizzazione",
     users: "Utenti",
     onboarding: "Prima attivazione",
+    conversations: {
+      newChat: "Nuova chat",
+      empty: "Nessuna conversazione",
+      deleteLabel: (title: string) => `Elimina la conversazione «${title}»`,
+      deleteConfirm: (title: string) => `Eliminare la conversazione «${title}»?`,
+      adminNotice: "Le conversazioni sono consultabili dagli amministratori.",
+    },
   },
   login: {
     title: "Accedi a Radix",

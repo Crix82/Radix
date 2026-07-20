@@ -19,6 +19,7 @@ export function App() {
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/chat/:conversationId" element={<ChatPage />} />
         <Route path="/viewer/:documentId/:page" element={<ViewerPage />} />
         <Route path="/sources" element={<SourcesPage />} />
         <Route path="/indexing" element={<IndexingPage />} />

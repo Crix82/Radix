@@ -1,8 +1,10 @@
 from app.models.tables import (
     AuditLog,
     Base,
+    ChatMessage,
     Chunk,
     Collection,
+    Conversation,
     Document,
     DocumentStatus,
     DocumentTag,
@@ -21,8 +23,10 @@ from app.models.tables import (
 __all__ = [
     "AuditLog",
     "Base",
+    "ChatMessage",
     "Chunk",
     "Collection",
+    "Conversation",
     "Document",
     "DocumentStatus",
     "DocumentTag",

@@ -25,7 +25,13 @@ export interface ChatFilters {
   collection_id?: number;
 }
 
+export interface ChatMeta {
+  conversation_id: number;
+  title: string;
+}
+
 interface StreamHandlers {
+  onMeta: (meta: ChatMeta) => void;
   onToken: (text: string) => void;
   onFinal: (final: ChatFinal) => void;
   onError: (err: Error) => void;
@@ -36,6 +42,7 @@ export async function streamChat(
   messages: ChatMessageIn[],
   filters: ChatFilters,
   handlers: StreamHandlers,
+  conversationId?: number,
   signal?: AbortSignal,
 ): Promise<void> {
   let resp: Response;
@@ -44,7 +51,7 @@ export async function streamChat(
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, filters }),
+      body: JSON.stringify({ messages, filters, conversation_id: conversationId ?? null }),
       signal,
     });
   } catch (e) {
@@ -84,7 +91,8 @@ function dispatch(block: string, handlers: StreamHandlers): void {
   if (!event || !data) return;
   try {
     const parsed = JSON.parse(data);
-    if (event === "token") handlers.onToken(parsed.text as string);
+    if (event === "meta") handlers.onMeta(parsed as ChatMeta);
+    else if (event === "token") handlers.onToken(parsed.text as string);
     else if (event === "final") handlers.onFinal(parsed as ChatFinal);
   } catch {
     // ignore malformed event

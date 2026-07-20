@@ -18,6 +18,13 @@ source of truth for the UI. Work proceeds one milestone at a time (SPEC §11).
   tsvector-free copy via `create_sqlite_chunks_table`).
 - Heavy deps (Docling/torch) must stay behind lazy imports so unit tests never load them;
   real-pipeline tests are marked `slow` and `importorskip` when Docling/Tesseract are absent.
+- **Every Alembic migration must be idempotent against the current models.** Migration `0001`
+  builds the schema with `Base.metadata.create_all()`, i.e. from the models as they are *now*,
+  so a fresh install already has the tables/columns a later migration adds — a bare
+  `CREATE TABLE` there fails with "already exists", and only on a clean install (never on a
+  populated DB, never on the SQLite tests). Create/alter only when absent, and make the
+  migration a no-op under `--sql` (offline can't inspect; `0001` already emits the DDL).
+  See `docs/adr/0008` and the `test_no_table_is_created_twice` guard.
 - Conventional commits (`feat:`, `fix:`, `chore:`, …).
 
 ## Dependencies & licenses

@@ -118,7 +118,8 @@ Stadi (job RQ, ognuno idempotente e riprocessabile): **discover → parse → (o
 
 - `POST /auth/login` · `POST /auth/logout` · `GET /me`
 - `GET /search?q=&lang=&doc_type=&collection_id=` → `[{chunk_id, document:{id,title,lang,doc_type,rel_path}, page, snippet_html, score}]`
-- `POST /chat` (SSE) — body `{messages:[...], filters:{lang?,doc_type?,collection_id?}}` → eventi `token` in streaming, poi `final {answer_md, citations:[{n, chunk_id, document_id, page, bboxes}]}`
+- `POST /chat` (SSE) — body `{messages:[...], filters:{lang?,doc_type?,collection_id?}, conversation_id?}` → evento `meta {conversation_id, title}`, poi `token` in streaming, poi `final {answer_md, citations:[{n, chunk_id, document_id, page, bboxes}]}`. Con `conversation_id` la history è quella salvata sul server (il client manda solo la nuova domanda)
+- `GET /conversations?user_id=` · `GET /conversations/{id}` (turni + citazioni) · `DELETE /conversations/{id}` (soft-delete, solo il proprietario). Un admin legge le conversazioni di tutti; la cosa è dichiarata nella UI
 - `GET /documents/{id}` · `GET /documents/{id}/pages/{n}.png` · `GET /documents/{id}/download`
 - `GET /indexing/stats` (totali, spazio, coda, errori) · `GET /indexing/queue` · `POST /documents/{id}/exclude` · `POST /documents/{id}/reindex`
 - `GET|POST|PATCH|DELETE /sources` · `POST /uploads` (multipart)
@@ -254,3 +255,22 @@ Regola: solo licenze permissive (Apache-2.0, MIT, BSD e simili). Vietate AGPL, S
   `rag.retrieve` (`NEIGHBOR_RADIUS=1`): un fatto spezzato su chunk adiacenti (header di una
   fattura + riga del totale) viaggia insieme nel contesto — i vicini condividono documento e
   collezione dell'anchor, nessun leak di permessi. `make lint`, `make test` (145 test) verdi.
+- 2026-07-20 · Persistenza delle conversazioni (post-M6, estensione oltre v1 decisa con il
+  committente — non era né in scope né in §13). Tabelle `conversations` (proprietario, titolo,
+  soft-delete) e `chat_messages` (turni con `citations` JSONB salvate come restituite, così che
+  un thread riaperto renderizzi identico senza ri-eseguire il retrieval); `GET /conversations`,
+  `GET|DELETE /conversations/{id}`; `POST /chat` accetta `conversation_id` ed emette un evento
+  SSE **`meta` prima del primo token** (un rifiuto non emette token: il client deve ricevere
+  l'id comunque). **La history diventa autoritativa lato server** — con un `conversation_id` i
+  turni precedenti si leggono dal DB e quanto manda il client viene ignorato — e viene
+  **cappata a 6 turni** (`HISTORY_TURNS`): `build_messages` non aveva alcun limite, innocuo
+  finché il client ripartiva da zero, non più con thread persistenti. Storico personale;
+  **un admin lo consulta in sola lettura, dichiarato nella UI**, ma non cancella i thread
+  altrui. UI: route `/chat/:conversationId`, lista conversazioni + "Nuova chat" in sidebar.
+  Trappola risolta: la `0001` fa `create_all()` dai modelli correnti, quindi su un'installazione
+  pulita le tabelle nuove esistono già e un `CREATE TABLE` in `0004` fallirebbe — ogni
+  migrazione va scritta idempotente rispetto ai modelli (guardia:
+  `test_no_table_is_created_twice`). Migrazione `0004` verificata su Postgres 16 reale (install
+  pulita e upgrade da `0003`). `make lint`, `make test` (166 test verdi, 1 `slow` skipped).
+  Decisioni in
+  `docs/adr/0008`.

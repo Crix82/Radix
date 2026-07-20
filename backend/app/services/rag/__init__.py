@@ -30,6 +30,10 @@ MAX_CONTEXT_TOKENS = 3500
 # invoice's payee header and its total line land in adjacent chunks); the neighbours carry the
 # rest of the fact into the LLM context. See _expand_with_neighbors.
 NEIGHBOR_RADIUS = 1
+# How many prior turns to replay into the prompt. Conversations are persisted and can grow
+# without bound, so the history has to be capped or the prompt does too; 3 exchanges is enough
+# for follow-up questions ("e per il modello B?") while leaving the context budget to retrieval.
+HISTORY_TURNS = 6
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")
 
 
@@ -209,7 +213,7 @@ def build_messages(
 ) -> list[dict[str, str]]:
     block = "\n\n".join(f"[{c.n}] ({c.title or '—'}, pag. {c.page})\n{c.text}" for c in context)
     augmented = f"Contesto:\n{block}\n\nDomanda: {question}"
-    prior = [m for m in history if m.get("role") in ("user", "assistant")][:-1]
+    prior = [m for m in history if m.get("role") in ("user", "assistant")][:-1][-HISTORY_TURNS:]
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         *prior,

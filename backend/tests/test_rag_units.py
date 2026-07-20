@@ -1,4 +1,5 @@
 from app.services.rag import (
+    HISTORY_TURNS,
     Citation,
     ContextChunk,
     build_messages,
@@ -65,6 +66,21 @@ def test_build_messages_keeps_prior_turns() -> None:
     assert roles == ["system", "user", "assistant", "user"]
     assert msgs[1]["content"] == "prima domanda"
     assert "seconda domanda" in msgs[-1]["content"]
+
+
+def test_build_messages_caps_the_replayed_history() -> None:
+    """Conversations are persisted now, so an old thread must not grow the prompt unbounded."""
+    context = [_ctx(1)]
+    history = [
+        {"role": "user" if i % 2 == 0 else "assistant", "content": f"turno {i}"} for i in range(20)
+    ]
+    history.append({"role": "user", "content": "domanda corrente"})
+
+    msgs = build_messages(context, history, "domanda corrente")
+    prior = msgs[1:-1]
+    assert len(prior) == HISTORY_TURNS
+    assert prior[-1]["content"] == "turno 19"  # the most recent turns are the ones kept
+    assert "turno 0" not in [m["content"] for m in prior]
 
 
 def test_refusal_phrase_is_exact() -> None:
