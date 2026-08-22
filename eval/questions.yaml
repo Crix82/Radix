@@ -37,3 +37,30 @@ questions:
 # Out-of-corpus question: must produce the exact refusal phrase, no LLM call.
 refusal:
   - q: "Qual è la coppia di serraggio per i bulloni della testata del modello RS-55?"
+
+# Multi-turn scripts (ADR 0010). Turns run in order through the same thread; a turn with
+# `doc`/`page` is scored like a question above. The follow-ups lean on the previous turn
+# (pronouns, "quella testata", "il suo ciclo") and only retrieve correctly if the query is
+# rewritten with the conversation; the last script switches topic to check a self-contained
+# question is not damaged by the rewrite.
+conversations:
+  - turns:
+      - q: "Qual è la coppia di serraggio dei bulloni della testata dell'RS-30?"
+      - q: "E in quale pagina del manuale lo hai trovato?"
+        doc: "RS-30_instruction_manual.pdf"
+        page: 2
+  - turns:
+      - q: "Qual è il codice della guarnizione della testata per l'RS-30?"
+      - q: "E qual è la coppia di serraggio di quella testata?"
+        doc: "RS-30_instruction_manual.pdf"
+        page: 2
+  - turns:
+      - q: "Quali dispositivi di protezione vanno indossati sulla linea L12?"
+      - q: "E come si avvia il suo ciclo automatico?"
+        doc: "L12_manuale_operatore.pdf"
+        page: 2
+  - turns:
+      - q: "Ogni quanto va controllato il livello dell'olio idraulico della pressa HP-200?"
+      - q: "Qual è il rapporto di miscelazione della resina EP-204?"
+        doc: "formulazione_EP-204.pdf"
+        page: 1

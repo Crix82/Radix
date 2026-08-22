@@ -147,6 +147,7 @@ Chat in streaming con indicatore "sta cercando nei documenti"; click su citazion
 
 - **Retrieval ibrido**: (a) dense su Qdrant, top 24; (b) FTS Postgres con `websearch_to_tsquery` nella lingua rilevata della query (fallback `simple`), top 24; fusione **RRF** (k=60); nessun reranker in v1 (estensione futura dietro interfaccia).
 - **Contesto**: top 8 chunk fusi, max ~3.500 token, ognuno etichettato `[n]` con titolo documento e pagina.
+- **Riscrittura contestuale della query** (post-M6, ADR 0010): dal secondo turno di una conversazione l'LLM condensa la domanda in una domanda autonoma (una chiamata breve, non-streaming, sugli ultimi turni); il retrieval gira su originale **e** riscritta e tiene la classifica di quella con la cosine densa migliore (a parità l'originale); la soglia di rifiuto legge quella stessa cosine. La riscrittura serve solo al retrieval: il prompt di risposta riporta le parole dell'utente. Disattivabile con `RAG_QUERY_REWRITE=false`.
 - **Soglia di rifiuto**: se il miglior punteggio fuso < `refusal_threshold` (in `settings`, calibrata in M4 sull'eval set) → risposta fissa **senza chiamare l'LLM**: *"Non presente nella documentazione indicizzata."* + suggerimento di aggiungere la fonte.
 - **Prompt di sistema** (base, in `services/rag/prompts.py`):
 
@@ -168,7 +169,7 @@ Chat in streaming con indicatore "sta cercando nei documenti"; click su citazion
 
 ## 10. Configurazione e profili hardware
 
-`.env` (esempi): `LLM_PROVIDER=ollama · LLM_MODEL=qwen3.5:9b-q4_K_M · EMBED_DEVICE=auto · OCR_LANGS=ita+eng+deu · SYNC_INTERVAL_MIN=5 · REFUSAL_THRESHOLD=… · DATA_DIR=./data`
+`.env` (esempi): `LLM_PROVIDER=ollama · LLM_MODEL=qwen3.5:9b-q4_K_M · EMBED_DEVICE=auto · OCR_LANGS=ita+eng+deu · SYNC_INTERVAL_MIN=5 · REFUSAL_THRESHOLD=… · RAG_QUERY_REWRITE=true · DATA_DIR=./data`
 
 | Profilo | Hardware | Modello LLM | Note |
 |---|---|---|---|
@@ -298,3 +299,24 @@ Regola: solo licenze permissive (Apache-2.0, MIT, BSD e simili). Vietate AGPL, S
   `tests/test_deploy_consistency.py`; `deploy/` restava fuori dal gate ruff/mypy e nessun test
   lo leggeva. `make lint`, `make test` (171 test verdi, 1 `slow` skipped). Decisioni in
   `docs/adr/0009`.
+- 2026-08-22 · Riscrittura contestuale della query di retrieval (post-M6, decisione di
+  prodotto rimandata il 2026-07-20 e presa con il committente). Il retrieval usava **solo
+  l'ultimo messaggio**: un follow-up ("e per la L12?", "in quale pagina l'hai trovato?") non
+  portava il soggetto del thread e finiva in rumore o in rifiuto a soglia senza chiamare l'LLM —
+  esposto dalla persistenza delle chat. Ora, dal secondo turno, `condense_question` fa
+  riscrivere la domanda all'LLM come domanda autonoma (chiamata breve, non-streaming, ultimi
+  turni troncati); il retrieval gira su **originale e riscritta e tiene la classifica di quella
+  con la cosine densa migliore** (a parità l'originale) — lo stesso segnale della soglia di
+  rifiuto, che resta identica. La riscrittura serve solo al retrieval (il prompt di risposta
+  riporta le parole dell'utente) e degrada sempre alla domanda grezza (output vuoto/troppo
+  lungo/frase di rifiuto/errore provider). Flag `RAG_QUERY_REWRITE` (default `true`) per il
+  profilo CPU. Eval: sezione `conversations` (4 script multi-turno, ≥ 3/4). **Verificato con
+  modelli reali senza Docker** (bge-m3 + Qwen2.5-1.5B via transformers, Qdrant in-memory, FTS
+  esclusa) su fixture + 24 chunk distrattori: per "in quale pagina del manuale lo hai trovato?"
+  il chunk atteso passa da *assente dalla top-8* (cosine 0.506) a **rango 2** (0.573); dove il
+  modello piccolo riscrive peggio ("testata" perso: 0.501 vs 0.640) vince l'originale; un cambio
+  di argomento resta invariato; due follow-up fuori corpus restano rifiutati. Due correzioni
+  emerse dalla verifica: la fusione RRF delle due query (prima stesura) **seppelliva** l'hit
+  della riscrittura (rango 2 in una lista, basso nell'altra → fuori dalla top-8 fusa), e gli
+  esempi nel prompt di riscrittura venivano copiati nell'output dal modello piccolo (tolti).
+  `make lint`, `make test` (190 test verdi, 1 `slow` skipped). Decisioni in `docs/adr/0010`.

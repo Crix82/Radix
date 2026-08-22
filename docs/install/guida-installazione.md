@@ -69,6 +69,7 @@ commenti: `.env.example`. Campi principali:
 | `LLM_RUNTIME` | `bundled` (Ollama nello stack) o `external` (endpoint gestito fuori) |
 | `LLM_MODEL` | tag del modello (es. `qwen3.5:9b-q4_K_M`) |
 | `LLM_BASE_URL` | endpoint OpenAI-compatibile (per `external`) |
+| `RAG_QUERY_REWRITE` | riscrittura contestuale dei follow-up in chat (`true` di default; `false` su host solo-CPU se la latenza pesa) |
 | `COMPOSE_FILE` | assemblaggio dello stack — **gestito dall'installer**, vedi sotto |
 
 ### Interruttore LLM: bundled vs external

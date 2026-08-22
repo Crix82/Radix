@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from app.api.search import _effective_collections
+from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.deps import CurrentUser, DbSession, client_ip
 from app.core.permissions import allowed_collection_ids
@@ -59,6 +60,7 @@ def chat(
 
     allowed = _effective_collections(allowed_collection_ids(db, user), body.filters.collection_id)
     threshold = get_refusal_threshold(db)
+    query_rewrite = get_settings().rag_query_rewrite
     question = next(m.content for m in reversed(body.messages) if m.role == "user")
 
     if body.conversation_id is None:
@@ -108,6 +110,7 @@ def chat(
                 refusal_threshold=threshold,
                 lang=body.filters.lang,
                 doc_type=body.filters.doc_type,
+                query_rewrite=query_rewrite,
             ):
                 if kind == "token":
                     yield _sse("token", {"text": payload})

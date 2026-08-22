@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # queries; borderline off-corpus (e.g. a nearby-but-absent model) is caught by the
     # LLM grounding. Override in the `settings` table (`refusal_threshold`). See ADR 0005.
     refusal_threshold: float = 0.45
+    # Rewrite follow-up questions into standalone queries before retrieval (ADR 0010). One
+    # extra short LLM call per turn that has history. Turn off on CPU-only hosts if the added
+    # latency is not worth it: retrieval then sees only the latest message, as before.
+    rag_query_rewrite: bool = True
 
     embed_device: str = "auto"
     embed_model: str = "BAAI/bge-m3"

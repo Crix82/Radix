@@ -1,11 +1,16 @@
+import pytest
+
 from app.services.rag import (
+    CONDENSE_TURN_CHARS,
     HISTORY_TURNS,
+    MAX_REWRITE_CHARS,
     Citation,
     ContextChunk,
     build_messages,
+    condense_question,
     parse_citations,
 )
-from app.services.rag.prompts import REFUSAL_PHRASE, SYSTEM_PROMPT
+from app.services.rag.prompts import CONDENSE_PROMPT, REFUSAL_PHRASE, SYSTEM_PROMPT
 
 
 def _ctx(n: int, chunk_id: int = None, page: int = 10) -> ContextChunk:
@@ -91,3 +96,84 @@ def test_citation_dataclass_shape() -> None:
     c = Citation(n=1, chunk_id=5, document_id=2, title="Doc", lang="it", page=142, bboxes=None)
     assert (c.n, c.chunk_id, c.document_id, c.page) == (1, 5, 2, 142)
     assert (c.title, c.lang) == ("Doc", "it")
+
+
+class _CondenseProvider:
+    """Scripted rewrite; records the single (non-streaming) call condense_question makes."""
+
+    def __init__(self, reply: str | None = None, error: Exception | None = None) -> None:
+        self.reply = reply
+        self.error = error
+        self.calls: list[tuple[bool, list[dict[str, str]]]] = []
+
+    def complete(self, messages, stream=True, json_schema=None):
+        self.calls.append((stream, messages))
+        if self.error is not None:
+            raise self.error
+        yield self.reply or ""
+
+
+_THREAD = [
+    {"role": "user", "content": "Qual è la coppia di serraggio della testata RS-30?"},
+    {"role": "assistant", "content": "La coppia è 85 Nm [1]."},
+    {"role": "user", "content": "E in quale pagina l'hai trovata?"},
+]
+
+
+def test_condense_skips_the_llm_on_a_first_turn() -> None:
+    provider = _CondenseProvider("mai usato")
+    q = "Qual è la coppia di serraggio?"
+    assert condense_question(provider, [{"role": "user", "content": q}], q) == q
+    assert provider.calls == []
+
+
+def test_condense_rewrites_from_the_prior_turns() -> None:
+    provider = _CondenseProvider("In quale pagina del manuale RS-30 è indicata la coppia?")
+    out = condense_question(provider, _THREAD, _THREAD[-1]["content"])
+    assert out == "In quale pagina del manuale RS-30 è indicata la coppia?"
+    (stream, messages), *rest = provider.calls
+    assert rest == [] and stream is False  # one short non-streaming call
+    assert messages[0] == {"role": "system", "content": CONDENSE_PROMPT}
+    prompt = messages[-1]["content"]
+    assert "Utente: Qual è la coppia di serraggio della testata RS-30?" in prompt
+    assert "Assistente: La coppia è 85 Nm [1]." in prompt
+    assert prompt.endswith("Ultima domanda: E in quale pagina l'hai trovata?\n\nDomanda riscritta:")
+    # the current question is not replayed as a prior turn
+    assert prompt.count("E in quale pagina l'hai trovata?") == 1
+
+
+def test_condense_strips_label_quotes_and_extra_lines() -> None:
+    provider = _CondenseProvider('Domanda riscritta: "Coppia di serraggio RS-30?"\nNota: ok')
+    assert condense_question(provider, _THREAD, "E la coppia?") == "Coppia di serraggio RS-30?"
+
+
+@pytest.mark.parametrize(
+    "reply",
+    ["", "   \n", REFUSAL_PHRASE, "x" * (MAX_REWRITE_CHARS + 1)],
+    ids=["empty", "blank", "refusal-phrase", "overlong"],
+)
+def test_condense_falls_back_to_the_question_on_unusable_output(reply: str) -> None:
+    q = _THREAD[-1]["content"]
+    assert condense_question(_CondenseProvider(reply), _THREAD, q) == q
+
+
+def test_condense_falls_back_when_the_provider_fails() -> None:
+    q = _THREAD[-1]["content"]
+    assert condense_question(_CondenseProvider(error=RuntimeError("down")), _THREAD, q) == q
+
+
+def test_condense_clips_long_turns_and_caps_history() -> None:
+    long_answer = "parola " * 400  # far beyond CONDENSE_TURN_CHARS
+    history = [
+        {"role": "user" if i % 2 == 0 else "assistant", "content": f"turno {i}"} for i in range(20)
+    ]
+    history += [
+        {"role": "assistant", "content": long_answer},
+        {"role": "user", "content": "e poi?"},
+    ]
+    provider = _CondenseProvider("E poi cosa succede?")
+    condense_question(provider, history, "e poi?")
+    prompt = provider.calls[0][1][-1]["content"]
+    assert "turno 0" not in prompt and "turno 19" in prompt  # HISTORY_TURNS most recent only
+    assert len(prompt) < CONDENSE_TURN_CHARS * (HISTORY_TURNS + 1)
+    assert "…" in prompt  # the long answer was clipped, not dropped

@@ -311,3 +311,69 @@ def test_conversations_require_auth(client: TestClient) -> None:
 )
 def test_title_from_question(question: str, expected: str) -> None:
     assert title_from_question(question) == expected
+
+
+class TwoStageProvider:
+    """Records every call; answers the rewrite (non-streaming) and the answer (streaming)."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[bool, list[dict[str, str]]]] = []
+
+    def complete(self, messages, stream=True, json_schema=None) -> Iterator[str]:
+        self.calls.append((stream, messages))
+        yield "Coppia di serraggio della testata RS-30?" if not stream else "risposta [1]"
+
+
+def test_follow_up_is_rewritten_from_the_stored_thread(
+    client: TestClient,
+    api_db: Session,
+    admin_user: User,
+    chat_corpus,
+    monkeypatch,
+) -> None:
+    """The rewrite prompt is built from the turns the server stored, and only from the second
+    turn on — a first question costs no extra LLM call."""
+    provider = TwoStageProvider()
+    monkeypatch.setattr(
+        "app.services.vectorstore.search", lambda *a, **k: [(chat_corpus["chunk"], 0.72)]
+    )
+    monkeypatch.setattr("app.services.rag.fts_search", lambda *a, **k: [])
+    monkeypatch.setattr("app.api.chat.get_llm_provider", lambda: provider)
+
+    first = _ask(client, "Qual è la coppia di serraggio della testata RS-30?")
+    conversation_id = next(d for e, d in first if e == "meta")["conversation_id"]
+    assert [stream for stream, _ in provider.calls] == [True]
+
+    _ask(client, "E la sua guarnizione?", conversation_id)
+    assert [stream for stream, _ in provider.calls] == [True, False, True]
+    rewrite_prompt = provider.calls[1][1][-1]["content"]
+    assert "Utente: Qual è la coppia di serraggio della testata RS-30?" in rewrite_prompt
+    assert "Assistente: risposta [1]" in rewrite_prompt
+    assert "Ultima domanda: E la sua guarnizione?" in rewrite_prompt
+
+
+def test_query_rewrite_flag_off_skips_the_extra_call(
+    client: TestClient,
+    api_db: Session,
+    admin_user: User,
+    chat_corpus,
+    monkeypatch,
+) -> None:
+    from app.core.config import get_settings
+
+    provider = TwoStageProvider()
+    monkeypatch.setattr(
+        "app.services.vectorstore.search", lambda *a, **k: [(chat_corpus["chunk"], 0.72)]
+    )
+    monkeypatch.setattr("app.services.rag.fts_search", lambda *a, **k: [])
+    monkeypatch.setattr("app.api.chat.get_llm_provider", lambda: provider)
+    monkeypatch.setenv("RAG_QUERY_REWRITE", "false")
+    get_settings.cache_clear()
+    try:
+        conversation_id = next(d for e, d in _ask(client, "prima") if e == "meta")[
+            "conversation_id"
+        ]
+        _ask(client, "e poi?", conversation_id)
+    finally:
+        get_settings.cache_clear()
+    assert [stream for stream, _ in provider.calls] == [True, True]

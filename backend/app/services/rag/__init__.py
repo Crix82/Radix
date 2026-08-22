@@ -6,6 +6,7 @@ and does not distinguish an on-corpus hit from an off-corpus one (see ADR 0005).
 """
 
 import json
+import logging
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -19,7 +20,7 @@ from app.services import vectorstore
 from app.services.chunking import estimate_tokens
 from app.services.embeddings import Embedder
 from app.services.llm.base import LLMProvider
-from app.services.rag.prompts import REFUSAL_PHRASE, SYSTEM_PROMPT
+from app.services.rag.prompts import CONDENSE_PROMPT, REFUSAL_PHRASE, SYSTEM_PROMPT
 from app.services.search import TOP_PER_RETRIEVER, fts_search
 from app.services.search.fusion import rrf_fuse
 
@@ -34,7 +35,17 @@ NEIGHBOR_RADIUS = 1
 # without bound, so the history has to be capped or the prompt does too; 3 exchanges is enough
 # for follow-up questions ("e per il modello B?") while leaving the context budget to retrieval.
 HISTORY_TURNS = 6
+# Conversational query rewriting (ADR 0010). Retrieval sees only the latest question, so a
+# follow-up ("e per la L12?", "in quale pagina l'hai trovato?") carries none of the subject the
+# thread established: it retrieves noise or falls under the refusal threshold without the LLM
+# ever being called. condense_question turns it into a standalone query first; only turns with
+# history pay the extra call.
+CONDENSE_TURN_CHARS = 500  # per replayed turn in the rewrite prompt — keeps it short on CPU
+MAX_REWRITE_CHARS = 400  # longer than this is an answer or a ramble, not a question
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")
+_REWRITE_LABEL_RE = re.compile(r"^domanda riscritta\s*:\s*", re.IGNORECASE)
+
+logger = logging.getLogger(__name__)
 
 
 def _as_dict(value: Any) -> dict[str, Any] | None:
@@ -61,6 +72,7 @@ class ContextChunk:
 class Retrieval:
     chunks: list[ContextChunk]
     max_dense_score: float
+    query: str = ""  # the query whose ranking was kept (see retrieve)
 
 
 @dataclass
@@ -93,6 +105,9 @@ class ChatResult:
     answer_md: str
     citations: list[Citation] = field(default_factory=list)
     refusal: bool = False
+    # The query whose ranking retrieval kept (the rewrite or the question itself — see
+    # retrieve). Diagnostic: surfaced by the eval harness, not sent to the client.
+    retrieval_query: str | None = None
 
 
 def _expand_with_neighbors(
@@ -151,25 +166,39 @@ def retrieve(
     allowed_collection_ids: list[int] | None,
     lang: str | None = None,
     doc_type: str | None = None,
+    rewritten: str | None = None,
 ) -> Retrieval:
-    if allowed_collection_ids is not None and not allowed_collection_ids:
-        return Retrieval(chunks=[], max_dense_score=0.0)
+    """Hybrid retrieval for `query`; with `rewritten` (its context-resolved form, see
+    condense_question) both run and the ranking of the query whose best dense hit is stronger
+    is kept — the same signal the refusal threshold reads (ADR 0005). Ties keep the original.
 
-    dense = vectorstore.search(
-        client,
-        embedder.embed_query(query),
-        TOP_PER_RETRIEVER,
-        allowed_collection_ids,
-        lang,
-        doc_type,
-    )
-    max_dense = dense[0][1] if dense else 0.0
+    Not RRF-fused across the two: with k=60 a chunk ranked 2nd by the rewrite but low by the
+    raw follow-up loses to chunks ranked mid-way by both, i.e. the fusion buries exactly the
+    hit the rewrite exists to surface (measured in ADR 0010). Best-of-two keeps the raw
+    question as a safety net: a rewrite that drifts matches the corpus worse and loses."""
+    if allowed_collection_ids is not None and not allowed_collection_ids:
+        return Retrieval(chunks=[], max_dense_score=0.0, query=query)
+
+    queries = [query] if not rewritten or rewritten == query else [query, rewritten]
+    max_dense, dense, used = -1.0, [], query
+    for q in queries:
+        hits = vectorstore.search(
+            client,
+            embedder.embed_query(q),
+            TOP_PER_RETRIEVER,
+            allowed_collection_ids,
+            lang,
+            doc_type,
+        )
+        top = hits[0][1] if hits else 0.0
+        if top > max_dense:  # strict: the original (first) keeps ties
+            max_dense, dense, used = top, hits, q
     fused = rrf_fuse(
-        [[cid for cid, _ in dense], fts_search(db, query, allowed_collection_ids, lang, doc_type)]
+        [[cid for cid, _ in dense], fts_search(db, used, allowed_collection_ids, lang, doc_type)]
     )
     fused_ids = [cid for cid, _ in fused[:TOP_CONTEXT]]
     if not fused_ids:
-        return Retrieval(chunks=[], max_dense_score=max_dense)
+        return Retrieval(chunks=[], max_dense_score=max_dense, query=used)
 
     context_ids = _expand_with_neighbors(db, fused_ids)
     rows = db.execute(
@@ -205,7 +234,7 @@ def retrieve(
                 lang=row[6],
             )
         )
-    return Retrieval(chunks=chunks, max_dense_score=max_dense)
+    return Retrieval(chunks=chunks, max_dense_score=max_dense, query=used)
 
 
 def build_messages(
@@ -219,6 +248,54 @@ def build_messages(
         *prior,
         {"role": "user", "content": augmented},
     ]
+
+
+def _clip(text: str, limit: int = CONDENSE_TURN_CHARS) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def _clean_rewrite(raw: str) -> str:
+    """First non-empty line, without a label the model may echo or wrapping quotes."""
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    return _REWRITE_LABEL_RE.sub("", lines[0]).strip().strip('"“”«»').strip()
+
+
+def condense_question(provider: LLMProvider, history: list[dict[str, str]], question: str) -> str:
+    """Rewrite `question` as a standalone query using the prior turns, or return it unchanged.
+
+    `history` has the same shape build_messages takes: the replayed turns with the current
+    question last. A first turn has nothing to resolve and costs no LLM call. On any doubt —
+    empty or overlong output, the refusal phrase, a provider error — the original question is
+    used: the rewrite is a retrieval aid and must never be what breaks a turn.
+    """
+    prior = [m for m in history if m.get("role") in ("user", "assistant")][:-1][-HISTORY_TURNS:]
+    if not prior:
+        return question
+    transcript = "\n".join(
+        f"{'Utente' if m['role'] == 'user' else 'Assistente'}: {_clip(m['content'])}" for m in prior
+    )
+    messages = [
+        {"role": "system", "content": CONDENSE_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                f"Conversazione:\n{transcript}\n\nUltima domanda: {question}\n\nDomanda riscritta:"
+            ),
+        },
+    ]
+    try:
+        rewritten = _clean_rewrite("".join(provider.complete(messages, stream=False)))
+    except Exception:  # noqa: BLE001 — degrade to the raw question, see docstring
+        logger.warning("query rewrite failed; retrieving with the raw question", exc_info=True)
+        return question
+    if not rewritten or len(rewritten) > MAX_REWRITE_CHARS or rewritten == REFUSAL_PHRASE:
+        return question
+    if rewritten != question:
+        logger.info("query rewritten: %r -> %r", question, rewritten)
+    return rewritten
 
 
 def parse_citations(answer: str, context: list[ContextChunk]) -> list[Citation]:
@@ -246,15 +323,27 @@ def answer_stream(
     refusal_threshold: float,
     lang: str | None = None,
     doc_type: str | None = None,
+    query_rewrite: bool = True,
 ) -> Iterator[tuple[str, Any]]:
     """Yield ('token', str) events then one ('final', ChatResult) event."""
     question = next(
         (m["content"] for m in reversed(messages) if m.get("role") == "user"), ""
     ).strip()
-    retrieval = retrieve(db, embedder, client, question, allowed_collection_ids, lang, doc_type)
+    rewritten = condense_question(provider, messages, question) if query_rewrite else question
+    retrieval = retrieve(
+        db, embedder, client, question, allowed_collection_ids, lang, doc_type, rewritten=rewritten
+    )
 
     if not retrieval.chunks or retrieval.max_dense_score < refusal_threshold:
-        yield "final", ChatResult(answer_md=REFUSAL_PHRASE, citations=[], refusal=True)
+        yield (
+            "final",
+            ChatResult(
+                answer_md=REFUSAL_PHRASE,
+                citations=[],
+                refusal=True,
+                retrieval_query=retrieval.query,
+            ),
+        )
         return
 
     llm_messages = build_messages(retrieval.chunks, messages, question)
@@ -269,7 +358,22 @@ def answer_stream(
     # parse_citations' "no [n] markers" fallback would attach every context chunk as a source —
     # a refusal rendered with a full Fonti panel. Same outcome as the threshold refusal above.
     if answer == REFUSAL_PHRASE:
-        yield "final", ChatResult(answer_md=REFUSAL_PHRASE, citations=[], refusal=True)
+        yield (
+            "final",
+            ChatResult(
+                answer_md=REFUSAL_PHRASE,
+                citations=[],
+                refusal=True,
+                retrieval_query=retrieval.query,
+            ),
+        )
         return
 
-    yield "final", ChatResult(answer_md=answer, citations=parse_citations(answer, retrieval.chunks))
+    yield (
+        "final",
+        ChatResult(
+            answer_md=answer,
+            citations=parse_citations(answer, retrieval.chunks),
+            retrieval_query=retrieval.query,
+        ),
+    )
