@@ -87,9 +87,15 @@ def run_question(deps: EvalDeps, question: str) -> ChatResult:
 
 
 def citation_matches(result: ChatResult, expected: Expected) -> bool:
+    """The expected document is cited at the expected page. A chunk can span pages (the
+    structure-aware chunker keeps short consecutive pages together: the RS-30 fixture is one
+    chunk over pages 1-2); `page` is its first page and `bboxes` is keyed by every page it
+    covers, so a citation also matches when the expected page is one of those."""
     stem = expected.doc.rsplit(".", 1)[0]
     return any(
-        c.title is not None and stem in c.title and c.page == expected.page
+        c.title is not None
+        and stem in c.title
+        and (c.page == expected.page or str(expected.page) in (c.bboxes or {}))
         for c in result.citations
     )
 
@@ -137,12 +143,12 @@ def evaluate(deps: EvalDeps, questions: list[Expected], refusals: list[str]) -> 
     refusal_ok = True
     for q in refusals:
         result = run_question(deps, q)
-        # A refusal is valid from either path: the cosine threshold (result.refusal) or the
-        # LLM following the grounding prompt and emitting the exact phrase (SPEC §8).
-        good = result.answer_md.strip() == REFUSAL_PHRASE
+        # A refusal is valid from either path: the cosine threshold or the LLM following the
+        # grounding prompt and emitting the phrase (SPEC §8); both set result.refusal and
+        # normalize answer_md to the exact phrase, so the two are not told apart here.
+        good = result.refusal and result.answer_md.strip() == REFUSAL_PHRASE
         refusal_ok = refusal_ok and good
-        source = "threshold" if result.refusal else "grounded"
-        state = f"refused ({source})" if good else result.answer_md[:50]
+        state = "refused" if good else result.answer_md[:50]
         print(f"  [{'PASS' if good else 'FAIL'}] refusal: {state}")
 
     ref = "ok" if refusal_ok else "FAILED"

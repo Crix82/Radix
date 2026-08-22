@@ -1,7 +1,8 @@
 # RAG eval set (SPEC §11, M4). Questions are answerable from the 5 checked-in fixture
 # PDFs (backend/tests/fixtures) plus the scanned Italian fixture, once indexed.
-# `doc` is matched as a substring of the document rel_path/title; `page` must appear in
-# the answer's citations. Cross-lingual and OCR cases are included on purpose.
+# `doc` is matched as a substring of the document rel_path/title; `page` must be the first
+# page of a cited chunk or one of the pages it spans (see run_eval.citation_matches).
+# Cross-lingual and OCR cases are included on purpose.
 questions:
   - q: "Qual è la coppia di serraggio dei bulloni della testata dell'RS-30?"
     doc: "RS-30_instruction_manual.pdf"

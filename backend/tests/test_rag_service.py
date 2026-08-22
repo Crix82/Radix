@@ -229,6 +229,33 @@ def test_answer_stream_flags_a_model_emitted_refusal(corpus, db_session, monkeyp
     assert [kind for kind, _ in events].count("token") == 2
 
 
+def test_answer_stream_flags_a_refusal_followed_by_an_explanation(
+    corpus, db_session, monkeypatch
+) -> None:
+    """Seen on the live stack with qwen3.5: the exact phrase, then a paragraph explaining what
+    the context does cover, with a [1] citation to the *other* model. That is a refusal."""
+    _wire(monkeypatch, dense=[(corpus["rs30"], 0.66)], fts=[corpus["rs30"]])
+    tokens = [
+        "Non presente nella documentazione indicizzata.",
+        "\n\nLa documentazione specifica che la coppia dell'RS-30 è 85 Nm [1], ",
+        "ma non contiene informazioni sul modello RS-55.",
+    ]
+    events = list(
+        rag.answer_stream(
+            db_session,
+            FakeEmbedder(),
+            object(),
+            FakeProvider(tokens),
+            [{"role": "user", "content": "coppia di serraggio RS-55?"}],
+            allowed_collection_ids=None,
+            refusal_threshold=0.55,
+        )
+    )
+    final = events[-1][1]
+    assert final.refusal is True and final.citations == []
+    assert final.answer_md == REFUSAL_PHRASE  # normalized: the explanation is dropped
+
+
 def test_answer_stream_empty_allowed_refuses(corpus, db_session, monkeypatch) -> None:
     _wire(monkeypatch, dense=[(corpus["boll"], 0.9)], fts=[corpus["boll"]])
     events = list(

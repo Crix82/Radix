@@ -320,3 +320,16 @@ Regola: solo licenze permissive (Apache-2.0, MIT, BSD e simili). Vietate AGPL, S
   della riscrittura (rango 2 in una lista, basso nell'altra → fuori dalla top-8 fusa), e gli
   esempi nel prompt di riscrittura venivano copiati nell'output dal modello piccolo (tolti).
   `make lint`, `make test` (190 test verdi, 1 `slow` skipped). Decisioni in `docs/adr/0010`.
+- 2026-08-22 · Eval sullo stack reale (`make up`, dev compose, `qwen3.5:9b-q4_K_M` su Ollama
+  GPU, corpus di 10 documenti indicizzati di cui 4 reali): **10/10 citazioni, rifiuto ok,
+  follow-up 4/4**. L'harness gira **dentro il container `api`** (Postgres/Qdrant non espongono
+  porte sull'host). Due difetti emersi e corretti: (1) **rifiuto emesso dal modello seguito da
+  una spiegazione** — Qwen3.5 scrive la frase esatta e prosegue ("…indicizzata.\n\nLa
+  documentazione specifica che l'RS-30 … [1]"), e il confronto `==` lo spediva come risposta
+  citata sul modello sbagliato: ora un'`answer` che *inizia* con la frase è un rifiuto,
+  normalizzato alla frase esatta (SPEC §8); (2) **scoring dell'eval su chunk multi-pagina** —
+  il chunker tiene insieme pagine brevi consecutive (l'RS-30 è un chunk 1–2 con `bboxes` su
+  entrambe), la citazione porta `page_start` e l'atteso "p2" non combaciava mai: una
+  citazione vale se la pagina attesa è `page` o una delle pagine coperte dal chunk. Con lo
+  scoring originale l'esito era 7/10 e follow-up 2/4 per quel solo motivo. `make lint`,
+  `make test` (191 test verdi).

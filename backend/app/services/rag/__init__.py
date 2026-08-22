@@ -357,7 +357,11 @@ def answer_stream(
     # the refusal phrase itself. Without this branch it would be flagged as a normal answer and
     # parse_citations' "no [n] markers" fallback would attach every context chunk as a source —
     # a refusal rendered with a full Fonti panel. Same outcome as the threshold refusal above.
-    if answer == REFUSAL_PHRASE:
+    # Prefix match: Qwen3.5 writes the exact phrase and then keeps going ("…indicizzata.\n\nLa
+    # documentazione specifica che l'RS-30 … ma non contiene nulla sull'RS-55 [1]"), which
+    # would otherwise ship as a cited answer about the wrong model. SPEC §8: the refusal is the
+    # exact phrase, so the trailing explanation is dropped.
+    if answer.startswith(REFUSAL_PHRASE):
         yield (
             "final",
             ChatResult(
