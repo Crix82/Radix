@@ -1,5 +1,12 @@
 # Radix reverse proxy — HTTPS with internal (self-signed) certificate by default.
 # For a customer certificate, replace `tls internal` with `tls /certs/cert.pem /certs/key.pem`.
+
+{
+	# Clients reaching the server by IP send no SNI; without a default, Caddy looks up a
+	# cert for the container's internal address and aborts the handshake.
+	default_sni {$RADIX_DOMAIN:localhost}
+}
+
 {$RADIX_DOMAIN:localhost} {
 	tls internal
 
