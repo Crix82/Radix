@@ -38,3 +38,9 @@ eval harness).
   domanda fuori corpus. Lo scoring verifica che una citazione punti al documento e alla
   pagina attesi; il punteggio di citazione è guidato dal retrieval (con fallback a tutte
   le fonti), quindi resta stabile anche con LLM piccoli. Nuova dipendenza dev: PyYAML (MIT).
+- **Contesto di Ollama fissato a 8192 token** (2026-10-22, emerso al deploy su RTX 5070 12 GB):
+  Ollama dimensiona il contesto dalla VRAM e sotto i 24 GB sceglie 4096. Il prompt RAG porta
+  fino a `MAX_CONTEXT_TOKENS` = 3500 token di estratti, più system prompt, storico e risposta:
+  sull'eval si misuravano già 3442 token per richiesta, e oltre 4096 Ollama taglia l'inizio del
+  prompt senza errori. `OLLAMA_CONTEXT_LENGTH` (default 8192, sovrascrivibile da `.env`) nei
+  compose bundled e dev. Il costo è solo memoria per la KV cache, non velocità.
