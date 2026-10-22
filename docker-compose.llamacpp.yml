@@ -12,6 +12,14 @@
 # records exactly what differed. The image tag is pinned: a floating tag would change the engine
 # between two runs being compared.
 services:
+  # Own image names: with the same COMPOSE_PROJECT_NAME as main (shared data, ADR 0012) the
+  # default `<project>-<service>` tags would collide, and every switch between the two stacks
+  # would rebuild — including the layer that bakes the Docling and bge-m3 models.
+  api:
+    image: radix-moe-api
+  worker:
+    image: radix-moe-worker
+
   llamacpp:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11459
     restart: unless-stopped
