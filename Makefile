@@ -3,7 +3,7 @@ COMPOSE_DEV  = $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 BACKEND_PY   = backend/.venv/bin/python
 BACKEND_BIN  = backend/.venv/bin
 
-.PHONY: up up-prod down logs test test-integration lint licenses eval backup restore test-restore install venv
+.PHONY: up up-prod down logs test test-integration lint licenses eval bench backup restore test-restore install venv
 
 ## --- Stack ---
 
@@ -47,7 +47,7 @@ lint:
 	cd backend && .venv/bin/ruff check app worker tests migrations ../eval
 	cd backend && .venv/bin/ruff format --check app worker tests migrations ../eval
 	cd backend && .venv/bin/mypy app worker
-	cd backend && .venv/bin/mypy --explicit-package-bases ../eval/run_eval.py
+	cd backend && .venv/bin/mypy --explicit-package-bases ../eval/run_eval.py ../eval/bench.py
 	cd frontend && npm run typecheck
 
 licenses:  ## fail on any non-permissive license (SPEC §14)
@@ -66,6 +66,9 @@ licenses:  ## fail on any non-permissive license (SPEC §14)
 
 eval:  ## RAG quality harness — needs an indexed corpus + running LLM (see eval/run_eval.py)
 	$(BACKEND_PY) eval/run_eval.py
+
+bench:  ## chat latency benchmark — same corpus on each machine; ARGS="--label pc --runs 3"
+	$(BACKEND_PY) eval/bench.py $(ARGS)
 
 install:  ## guided install on a clean Ubuntu 24 host (wizard); ARGS=--non-interactive to skip prompts
 	./deploy/install.sh $(ARGS)
