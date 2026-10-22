@@ -45,3 +45,26 @@ primo token da decine di secondi a minuti; ik_llama.cpp e KTransformers vincono 
 (2–10×), KTransformers però richiede 24 GB di VRAM e kernel AMX/AVX-512 che l'EPYC 7452 (solo
 AVX2) non ha. La prima misura è quindi il primo token sul prompt RAG reale; leve successive:
 `-ub` grande, ik_llama.cpp, un budget di contesto ridotto per un modello più capace.
+
+## Misure
+
+### gpt-oss-120b MXFP4 (2026-10-22, llama.cpp b11459, `--fit` automatico, 32 thread)
+
+Prompt RAG reale di 5.399 token (estratti del libro di prova), cache dei prompt disattivata:
+
+| Configurazione | Lettura (prefill) | Primo token stimato | Scrittura |
+|---|---|---|---|
+| default (`-ub 512`) | 160 tok/s | ~34 s | 33 tok/s |
+| `-b/-ub 2048` | 410 tok/s | ~13 s | 35 tok/s |
+| `-b/-ub 4096` | 527 tok/s | ~10 s | 33 tok/s |
+| **`-b/-ub 8192`** | **723 tok/s** | **~7,5 s** | 32 tok/s |
+
+VRAM 6,3–6,8 GB in tutti i casi. È la leva del rapporto (batch di prefill grande): +4,5× sul
+prefill a costo nullo sulla scrittura, quindi diventa la configurazione del branch.
+
+Test Excel con la configurazione default (prima del `-ub`): **44/52** contro 43/52 di `main`
+(Qwen3.5 9B + traduzione), primo token mediano 32,6 s contro 2,3 s; `make eval` 10/10, rifiuto
+ok, follow-up 4/4. Risolve i tre calcoli/confronti su cui Qwen rifiutava (#18, #20, #21), ma
+**inventa un elenco di norme IEEE "valide nel 2026"** sulla domanda trappola #25. In ~40% delle
+risposte cita nel proprio formato (`【11†L1-L3】`) invece di `[n]`: ora normalizzato da
+`normalize_citations` prima dell'estrazione delle fonti.

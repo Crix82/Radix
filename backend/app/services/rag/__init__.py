@@ -57,6 +57,10 @@ MAX_REWRITE_CHARS = 400  # longer than this is an answer or a ramble, not a ques
 # whole context (12 chunks) filled the Fonti panel with pages of unrelated books (ADR 0005).
 FALLBACK_SOURCES = 3
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")
+# gpt-oss cites in its own trained format — 【11】 or 【11†L1-L3】 (source, line span) — instead
+# of the [n] the system prompt asks for, in ~40% of answers on the customer test (ADR 0012).
+# Normalised to [n] so the answer renders like any other and parse_citations sees the source.
+_NATIVE_CITATION_RE = re.compile(r"【(\d{1,2})(?:†[^】]*)?】")
 _REWRITE_LABEL_RE = re.compile(r"^domanda riscritta\s*:\s*", re.IGNORECASE)
 
 logger = logging.getLogger(__name__)
@@ -354,6 +358,11 @@ def translate_question(provider: LLMProvider, question: str) -> str | None:
     return translated
 
 
+def normalize_citations(answer: str) -> str:
+    """Rewrite model-native citation markers (【n】, 【n†Lx-Ly】) as the [n] Radix renders."""
+    return _NATIVE_CITATION_RE.sub(lambda m: f"[{m.group(1)}]", answer)
+
+
 def parse_citations(answer: str, context: list[ContextChunk]) -> list[Citation]:
     by_n = {c.n: c for c in context}
     seen: set[int] = set()
@@ -419,7 +428,7 @@ def answer_stream(
         buffer += token
         yield "token", token
 
-    answer = buffer.strip() or REFUSAL_PHRASE
+    answer = normalize_citations(buffer.strip()) or REFUSAL_PHRASE
     # Retrieval cleared the threshold but the model found no answer in the context and emitted
     # the refusal phrase itself. Without this branch it would be flagged as a normal answer and
     # parse_citations' "no [n] markers" fallback would attach every context chunk as a source —

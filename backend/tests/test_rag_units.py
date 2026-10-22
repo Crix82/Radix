@@ -219,3 +219,18 @@ def test_translate_question_drops_unusable_output(out) -> None:
     from app.services.rag import translate_question
 
     assert translate_question(_OneShot(out), "Qual è la coppia di serraggio della testata?") is None
+
+
+def test_normalize_citations_rewrites_gpt_oss_markers() -> None:
+    from app.services.rag import normalize_citations
+
+    answer = "Fasce di potenza【11†L1-L3】, vedi anche 【2】 e [3]."
+    assert normalize_citations(answer) == "Fasce di potenza[11], vedi anche [2] e [3]."
+
+
+def test_native_markers_are_parsed_as_citations() -> None:
+    from app.services.rag import normalize_citations
+
+    context = [_ctx(n) for n in range(1, 13)]
+    cites = parse_citations(normalize_citations("Risposta【11†L4-L5】."), context)
+    assert [c.n for c in cites] == [11]  # not the top-3 fallback
