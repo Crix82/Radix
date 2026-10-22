@@ -39,3 +39,9 @@ e gestibile da un consulente IT generico.
 - **Script deploy condivisi** via `deploy/_common.sh` (root dir, rilevamento `docker`/`sudo
   docker`, load `.env`, `require_running`). Gli script non entrano nei gate `ruff`/`mypy`
   (sono bash); verificati con `bash -n` (e `shellcheck` se disponibile, non obbligatorio).
+- **GPU anche al `worker`, non all'`api`** (2026-10-22, emerso al primo deploy su RTX 5070
+  12 GB): l'override `docker-compose.gpu.yml` passava la GPU solo a Ollama, quindi parsing
+  Docling ed embedding bge-m3 giravano su CPU. Ora la riceve anche il `worker` (Docling e
+  `EMBED_DEVICE=auto` scelgono CUDA da soli). L'`api` resta su CPU: incorpora una query alla
+  volta e una seconda copia di bge-m3 in VRAM, accanto al 9B, non starebbe su 12 GB senza
+  rischiare l'offload parziale dell'LLM (SPEC §10). L'OCR Tesseract resta CPU in ogni caso.

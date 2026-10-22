@@ -4,8 +4,21 @@
 # Enable by hand with:
 #   docker compose -f docker-compose.yml -f docker-compose.llm.yml -f docker-compose.gpu.yml up -d
 # Requires the NVIDIA Container Toolkit on the host; layer it only on GPU hosts.
+#
+# The worker gets the GPU too: Docling layout/table models and bge-m3 pick CUDA automatically
+# (EMBED_DEVICE=auto), which is where ingestion spends its time. The api stays on CPU: it only
+# embeds one query at a time, and a second bge-m3 copy in VRAM would crowd the LLM on 12 GB cards.
 services:
   ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  worker:
     deploy:
       resources:
         reservations:
