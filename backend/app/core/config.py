@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     llm_provider: str = "ollama"
     llm_model: str = "qwen3.5:9b-q4_K_M"
     llm_base_url: str = "http://localhost:11434/v1"
+    # Seconds the client waits for the LLM between streamed chunks (and for the first one).
+    # 120 s is ample for a model fully in VRAM; a large MoE with experts in RAM (moe-hybrid,
+    # ADR 0012) can spend minutes reading a 6000-token RAG prompt before the first token.
+    llm_timeout_s: float = 120.0
     # Refusal threshold on the best dense cosine. Calibrated in M4: answerable eval
     # questions score >= 0.52, so 0.45 leaves margin while refusing clearly-unrelated
     # queries; borderline off-corpus (e.g. a nearby-but-absent model) is caught by the

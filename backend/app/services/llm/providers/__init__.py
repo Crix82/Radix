@@ -18,4 +18,11 @@ class VLLMProvider(OpenAICompatibleProvider):
     """Production provider (SPEC §2): vLLM, same OpenAI-compatible API."""
 
 
-__all__ = ["OllamaProvider", "OpenAICompatibleProvider", "VLLMProvider"]
+class LlamaCppProvider(OpenAICompatibleProvider):
+    """llama.cpp `llama-server` (moe-hybrid, ADR 0012): large MoE models with the routed
+    experts in system RAM, which Ollama cannot place. Same OpenAI-compatible API; reasoning
+    controls are set server-side (e.g. `--chat-template-kwargs`), and the server returns any
+    reasoning in a separate field, so the content-only stream needs no extra payload."""
+
+
+__all__ = ["LlamaCppProvider", "OllamaProvider", "OpenAICompatibleProvider", "VLLMProvider"]

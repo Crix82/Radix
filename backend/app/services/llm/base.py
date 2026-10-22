@@ -23,11 +23,17 @@ class LLMProvider(ABC):
 
 
 def get_llm_provider() -> LLMProvider:
-    from app.services.llm.providers import OllamaProvider, VLLMProvider
+    from app.services.llm.providers import LlamaCppProvider, OllamaProvider, VLLMProvider
 
     settings = get_settings()
-    providers: dict[str, type[LLMProvider]] = {"ollama": OllamaProvider, "vllm": VLLMProvider}
+    providers: dict[str, type[LLMProvider]] = {
+        "ollama": OllamaProvider,
+        "vllm": VLLMProvider,
+        "llamacpp": LlamaCppProvider,
+    }
     provider_cls = providers.get(settings.llm_provider.lower())
     if provider_cls is None:
         raise ValueError(f"Unknown LLM_PROVIDER: {settings.llm_provider}")
-    return provider_cls(base_url=settings.llm_base_url, model=settings.llm_model)  # type: ignore[call-arg]
+    return provider_cls(  # type: ignore[call-arg]
+        base_url=settings.llm_base_url, model=settings.llm_model, timeout=settings.llm_timeout_s
+    )

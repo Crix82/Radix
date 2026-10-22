@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import pytest
 
 from app.services.llm.base import get_llm_provider
-from app.services.llm.providers import OllamaProvider, VLLMProvider
+from app.services.llm.providers import LlamaCppProvider, OllamaProvider, VLLMProvider
 from app.services.llm.providers.openai_compatible import OpenAICompatibleProvider
 
 
@@ -94,6 +94,10 @@ def test_get_llm_provider_selects_by_env(monkeypatch: pytest.MonkeyPatch) -> Non
     get_settings.cache_clear()
     assert isinstance(get_llm_provider(), VLLMProvider)
 
+    monkeypatch.setenv("LLM_PROVIDER", "llamacpp")
+    get_settings.cache_clear()
+    assert isinstance(get_llm_provider(), LlamaCppProvider)
+
     monkeypatch.setenv("LLM_PROVIDER", "bogus")
     get_settings.cache_clear()
     with pytest.raises(ValueError, match="Unknown LLM_PROVIDER"):
@@ -117,3 +121,23 @@ def test_ollama_disables_reasoning_but_vllm_does_not() -> None:
     assert ollama["reasoning_effort"] == "none"
     vllm = VLLMProvider(base_url="http://x/v1", model="m")._payload(msgs, False, None)
     assert "reasoning_effort" not in vllm
+
+
+def test_llm_timeout_comes_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A large MoE with experts in RAM can read a RAG prompt for minutes (ADR 0012)."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("LLM_PROVIDER", "llamacpp")
+    monkeypatch.setenv("LLM_TIMEOUT_S", "900")
+    get_settings.cache_clear()
+    try:
+        provider = get_llm_provider()
+        assert isinstance(provider, LlamaCppProvider) and provider.timeout == 900.0
+    finally:
+        get_settings.cache_clear()
+
+
+def test_llamacpp_sends_no_reasoning_override() -> None:
+    msgs = [{"role": "user", "content": "x"}]
+    payload = LlamaCppProvider(base_url="http://x/v1", model="m")._payload(msgs, False, None)
+    assert "reasoning_effort" not in payload  # set server-side via --chat-template-kwargs

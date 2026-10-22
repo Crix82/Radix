@@ -1,0 +1,54 @@
+# moe-hybrid (ADR 0012): llama.cpp `llama-server` as the LLM runtime, for large MoE models whose
+# routed experts live in system RAM while attention, dense layers and KV cache use the GPU.
+# Ollama cannot place experts that way, so this replaces docker-compose.llm.yml:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.llamacpp.yml
+# with, in .env:
+#   LLM_PROVIDER=llamacpp  LLM_BASE_URL=http://llamacpp:8080/v1  LLM_MODEL=<alias below>
+#   LLM_TIMEOUT_S=900      LLAMACPP_MODEL=<file in GGUF_DIR>      GGUF_DIR=<host folder>
+#
+# Baseline is llama.cpp's own automatic placement (`--fit`, on by default): it fills the GPU with
+# the dense weights first and leaves the experts in RAM. Anything else (thread count, -ub,
+# --n-cpu-moe, KV cache type, reasoning budget) goes in LLAMACPP_ARGS so every benchmark run
+# records exactly what differed. The image tag is pinned: a floating tag would change the engine
+# between two runs being compared.
+services:
+  llamacpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11459
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        exec /app/llama-server
+        --model /models/$${LLAMACPP_MODEL}
+        --alias $${LLM_MODEL}
+        --host 0.0.0.0 --port 8080
+        --ctx-size $${LLAMACPP_CTX}
+        --threads $${LLAMACPP_THREADS}
+        --jinja
+        $${LLAMACPP_ARGS}
+    environment:
+      LLAMACPP_MODEL: ${LLAMACPP_MODEL:?set LLAMACPP_MODEL to the GGUF file name}
+      LLM_MODEL: ${LLM_MODEL}
+      # RAG prompt (up to 6000 tokens of excerpts) + history + answer, as for Ollama (ADR 0005).
+      LLAMACPP_CTX: ${LLAMACPP_CTX:-16384}
+      # Physical cores: decode is RAM-bandwidth bound and SMT threads only add contention.
+      LLAMACPP_THREADS: ${LLAMACPP_THREADS:-32}
+      LLAMACPP_ARGS: ${LLAMACPP_ARGS:-}
+    volumes:
+      - ${GGUF_DIR:-./models/gguf}:/models:ro
+    ports:
+      # Localhost only, for running benchmarks against the raw server.
+      - "127.0.0.1:8081:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s  # loading 60-200 GB of weights from disk takes minutes
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
