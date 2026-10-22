@@ -330,15 +330,22 @@ def test_follow_up_is_rewritten_from_the_stored_thread(
     admin_user: User,
     chat_corpus,
     monkeypatch,
+    request,
 ) -> None:
     """The rewrite prompt is built from the turns the server stored, and only from the second
-    turn on — a first question costs no extra LLM call."""
+    turn on — a first question costs no extra LLM call. (Translation off: it is another call,
+    covered by test_query_translation_adds_one_call_per_turn.)"""
+    from app.core.config import get_settings
+
     provider = TwoStageProvider()
     monkeypatch.setattr(
         "app.services.vectorstore.search", lambda *a, **k: [(chat_corpus["chunk"], 0.72)]
     )
     monkeypatch.setattr("app.services.rag.fts_search", lambda *a, **k: [])
     monkeypatch.setattr("app.api.chat.get_llm_provider", lambda: provider)
+    monkeypatch.setenv("RAG_QUERY_TRANSLATE", "false")
+    get_settings.cache_clear()
+    request.addfinalizer(get_settings.cache_clear)
 
     first = _ask(client, "Qual è la coppia di serraggio della testata RS-30?")
     conversation_id = next(d for e, d in first if e == "meta")["conversation_id"]
@@ -368,6 +375,7 @@ def test_query_rewrite_flag_off_skips_the_extra_call(
     monkeypatch.setattr("app.services.rag.fts_search", lambda *a, **k: [])
     monkeypatch.setattr("app.api.chat.get_llm_provider", lambda: provider)
     monkeypatch.setenv("RAG_QUERY_REWRITE", "false")
+    monkeypatch.setenv("RAG_QUERY_TRANSLATE", "false")
     get_settings.cache_clear()
     try:
         conversation_id = next(d for e, d in _ask(client, "prima") if e == "meta")[
@@ -377,3 +385,32 @@ def test_query_rewrite_flag_off_skips_the_extra_call(
     finally:
         get_settings.cache_clear()
     assert [stream for stream, _ in provider.calls] == [True, True]
+
+
+def test_query_translation_adds_one_call_per_turn(
+    client: TestClient,
+    api_db: Session,
+    admin_user: User,
+    chat_corpus,
+    monkeypatch,
+    request,
+) -> None:
+    """With RAG_QUERY_TRANSLATE on (the default) an Italian question costs one short
+    non-streaming call before the streamed answer (ADR 0011)."""
+    from app.core.config import get_settings
+
+    provider = TwoStageProvider()
+    monkeypatch.setattr(
+        "app.services.vectorstore.search", lambda *a, **k: [(chat_corpus["chunk"], 0.72)]
+    )
+    monkeypatch.setattr("app.services.rag.fts_search", lambda *a, **k: [])
+    monkeypatch.setattr("app.api.chat.get_llm_provider", lambda: provider)
+    monkeypatch.delenv("RAG_QUERY_TRANSLATE", raising=False)
+    get_settings.cache_clear()
+    request.addfinalizer(get_settings.cache_clear)
+
+    _ask(client, "Qual è la coppia di serraggio della testata RS-30?")
+    assert [stream for stream, _ in provider.calls] == [False, True]
+    assert provider.calls[0][1][-1]["content"] == (
+        "Qual è la coppia di serraggio della testata RS-30?"
+    )

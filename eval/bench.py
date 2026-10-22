@@ -45,10 +45,18 @@ class Timing:
 
 
 def time_question(deps: EvalDeps, question: str) -> Timing:
-    """Time one first-turn question; mirrors rag.answer_stream (no rewrite on a first turn)."""
+    """Time one first-turn question; mirrors rag.answer_stream (no rewrite on a first turn;
+    the translation, when enabled, is counted in the retrieval time)."""
     start = time.perf_counter()
-    retrieval = rag.retrieve(deps.db, deps.embedder, deps.client, question, None)
-    retrieval_s = time.perf_counter() - start
+    translated = (
+        rag.translate_question(deps.provider, question)
+        if get_settings().rag_query_translate
+        else None
+    )
+    retrieval = rag.retrieve(
+        deps.db, deps.embedder, deps.client, question, None, translated=translated
+    )
+    retrieval_s = time.perf_counter() - start  # includes the translation call, if any
 
     if not retrieval.chunks or retrieval.max_dense_score < deps.threshold:
         return Timing(question, retrieval_s, None, retrieval_s, 0)

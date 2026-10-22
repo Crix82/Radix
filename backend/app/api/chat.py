@@ -61,6 +61,7 @@ def chat(
     allowed = _effective_collections(allowed_collection_ids(db, user), body.filters.collection_id)
     threshold = get_refusal_threshold(db)
     query_rewrite = get_settings().rag_query_rewrite
+    query_translate = get_settings().rag_query_translate
     question = next(m.content for m in reversed(body.messages) if m.role == "user")
 
     if body.conversation_id is None:
@@ -111,6 +112,7 @@ def chat(
                 lang=body.filters.lang,
                 doc_type=body.filters.doc_type,
                 query_rewrite=query_rewrite,
+                query_translate=query_translate,
             ):
                 if kind == "token":
                     yield _sse("token", {"text": payload})

@@ -38,7 +38,7 @@ eval harness).
   domanda fuori corpus. Lo scoring verifica che una citazione punti al documento e alla
   pagina attesi; il punteggio di citazione è guidato dal retrieval (con fallback a tutte
   le fonti), quindi resta stabile anche con LLM piccoli. Nuova dipendenza dev: PyYAML (MIT).
-- **Contesto di Ollama fissato a 8192 token** (2026-10-22, emerso al deploy su RTX 5070 12 GB):
+- **Contesto di Ollama fissato a 8192 token** (2026-10-22, emerso al deploy su RTX 3070 Ti 8 GB):
   Ollama dimensiona il contesto dalla VRAM e sotto i 24 GB sceglie 4096. Il prompt RAG porta
   fino a `MAX_CONTEXT_TOKENS` = 3500 token di estratti, più system prompt, storico e risposta:
   sull'eval si misuravano già 3442 token per richiesta, e oltre 4096 Ollama taglia l'inizio del
@@ -58,3 +58,8 @@ eval harness).
   IT / testo EN (nessun termine in comune): resta utile sui corpus nella lingua delle domande.
   Restano fuori le domande con la pagina giusta molto in basso (rango 13–127): servirebbe un
   reranker o la traduzione della query, rimandati.
+- **Fallback delle fonti limitato ai primi 3 estratti** (2026-10-22). Se il modello non mette
+  marcatori `[n]`, prima si allegava l'intero contesto (oggi 12 chunk): nel test sul libro di
+  481 pagine il pannello Fonti si riempiva di pagine di altri libri sullo stesso tema.
+  `FALLBACK_SOURCES=3`: il contesto è in ordine di retrieval, quindi i primi sono i più
+  pertinenti. La risposta resta sempre con fonti (SPEC §8), ma non con quelle irrilevanti.

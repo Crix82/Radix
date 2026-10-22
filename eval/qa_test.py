@@ -23,6 +23,7 @@ import openpyxl
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_eval import EvalDeps, build_deps  # noqa: E402
 
+from app.core.config import get_settings  # noqa: E402
 from app.services import rag  # noqa: E402
 from app.services.rag import ChatResult  # noqa: E402
 
@@ -63,6 +64,7 @@ def ask(deps: EvalDeps, question: str) -> tuple[ChatResult, float | None, float]
         messages=[{"role": "user", "content": question}],
         allowed_collection_ids=None,
         refusal_threshold=deps.threshold,
+        query_translate=get_settings().rag_query_translate,
     ):
         if kind == "token" and first is None:
             first = time.perf_counter() - start

@@ -39,9 +39,24 @@ e gestibile da un consulente IT generico.
 - **Script deploy condivisi** via `deploy/_common.sh` (root dir, rilevamento `docker`/`sudo
   docker`, load `.env`, `require_running`). Gli script non entrano nei gate `ruff`/`mypy`
   (sono bash); verificati con `bash -n` (e `shellcheck` se disponibile, non obbligatorio).
-- **GPU anche al `worker`, non all'`api`** (2026-10-22, emerso al primo deploy su RTX 5070
-  12 GB): l'override `docker-compose.gpu.yml` passava la GPU solo a Ollama, quindi parsing
+- **GPU anche al `worker`, non all'`api`** (2026-10-22, emerso al primo deploy su RTX 3070
+  Ti 8 GB): l'override `docker-compose.gpu.yml` passava la GPU solo a Ollama, quindi parsing
   Docling ed embedding bge-m3 giravano su CPU. Ora la riceve anche il `worker` (Docling e
   `EMBED_DEVICE=auto` scelgono CUDA da soli). L'`api` resta su CPU: incorpora una query alla
-  volta e una seconda copia di bge-m3 in VRAM, accanto al 9B, non starebbe su 12 GB senza
+  volta e una seconda copia di bge-m3 in VRAM, accanto al 9B, non starebbe su 8 GB senza
   rischiare l'offload parziale dell'LLM (SPEC §10). L'OCR Tesseract resta CPU in ogni caso.
+- **GPU del worker solo da 12 GB in su; LLM sempre caricato** (2026-10-22, rivede la voce
+  precedente). Misurato sulla RTX 3070 Ti 8 GB: dopo il primo documento il worker tiene in VRAM
+  i modelli Docling e bge-m3 (~1,7 GB) fino al riavvio, e Qwen3.5 9B scende al 19% su CPU — la
+  chat passa da 68 a 43 tok/s. La GPU del worker passa quindi in un override a parte,
+  `docker-compose.gpu-worker.yml`, che `install.sh` aggiunge solo se la GPU più grande ha
+  almeno 12 GB; sotto, il worker gira su CPU (un server multi-core lo regge: il libro di 481
+  pagine si era indicizzato su CPU). Con la GPU tutta per l'LLM, `OLLAMA_KEEP_ALIVE=-1` di
+  default: il modello resta caricato e la prima domanda dopo una pausa non aspetta più il
+  ricaricamento (17–89 s misurati).
+- **Timeout dei job di elaborazione a 6 ore** (2026-10-22). RQ interrompe un job dopo 180 s
+  se non specificato, e l'interruzione cade *dentro* Docling, che la registra come pagina
+  fallita: ogni documento oltre i 3 minuti (un libro scansionato in OCR, un manuale di 481
+  pagine su CPU) finiva in errore come "Pipeline failed" senza traccia del timeout. Parsing ed
+  embedding ora sono accodati con `job_timeout` di 6 ore; la sincronizzazione delle fonti
+  resta col default.

@@ -5,20 +5,11 @@
 #   docker compose -f docker-compose.yml -f docker-compose.llm.yml -f docker-compose.gpu.yml up -d
 # Requires the NVIDIA Container Toolkit on the host; layer it only on GPU hosts.
 #
-# The worker gets the GPU too: Docling layout/table models and bge-m3 pick CUDA automatically
-# (EMBED_DEVICE=auto), which is where ingestion spends its time. The api stays on CPU: it only
-# embeds one query at a time, and a second bge-m3 copy in VRAM would crowd the LLM on 12 GB cards.
+# Only the LLM gets the GPU here. The worker can share it on cards of 12 GB or more, through
+# docker-compose.gpu-worker.yml (see that file and ADR 0007): below that, its models push the
+# LLM partly onto the CPU and the chat slows down.
 services:
   ollama:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
-  worker:
     deploy:
       resources:
         reservations:

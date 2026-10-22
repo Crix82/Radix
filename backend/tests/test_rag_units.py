@@ -42,10 +42,16 @@ def test_parse_citations_dedupes_and_ignores_unknown() -> None:
     assert [c.n for c in cites] == [1]
 
 
-def test_parse_citations_falls_back_to_all_sources_when_uncited() -> None:
+def test_parse_citations_falls_back_to_used_sources_when_uncited() -> None:
     context = [_ctx(1), _ctx(2)]
     cites = parse_citations("Risposta senza marcatori.", context)
     assert [c.n for c in cites] == [1, 2]  # SPEC §8: attach used sources anyway
+
+
+def test_parse_citations_fallback_keeps_only_the_best_ranked() -> None:
+    context = [_ctx(n) for n in range(1, 13)]
+    cites = parse_citations("Risposta senza marcatori.", context)
+    assert [c.n for c in cites] == [1, 2, 3]  # FALLBACK_SOURCES, in retrieval order
 
 
 def test_build_messages_has_system_context_and_question() -> None:
@@ -177,3 +183,39 @@ def test_condense_clips_long_turns_and_caps_history() -> None:
     assert "turno 0" not in prompt and "turno 19" in prompt  # HISTORY_TURNS most recent only
     assert len(prompt) < CONDENSE_TURN_CHARS * (HISTORY_TURNS + 1)
     assert "…" in prompt  # the long answer was clipped, not dropped
+
+
+class _OneShot:
+    def __init__(self, out: str | Exception) -> None:
+        self.out = out
+        self.calls = 0
+
+    def complete(self, messages, stream=True, json_schema=None):
+        self.calls += 1
+        if isinstance(self.out, Exception):
+            raise self.out
+        yield self.out
+
+
+def test_translate_question_returns_the_english_form() -> None:
+    from app.services.rag import translate_question
+
+    p = _OneShot('"What is the tightening torque of the cylinder head?"\n')
+    assert translate_question(p, "Qual è la coppia di serraggio della testata?") == (
+        "What is the tightening torque of the cylinder head?"
+    )
+
+
+def test_translate_question_skips_english_questions() -> None:
+    from app.services.rag import translate_question
+
+    p = _OneShot("unused")
+    assert translate_question(p, "What is the torque of the cylinder head bolts?") is None
+    assert p.calls == 0  # an English question costs no LLM call
+
+
+@pytest.mark.parametrize("out", [RuntimeError("down"), "", "x" * (MAX_REWRITE_CHARS + 1)])
+def test_translate_question_drops_unusable_output(out) -> None:
+    from app.services.rag import translate_question
+
+    assert translate_question(_OneShot(out), "Qual è la coppia di serraggio della testata?") is None

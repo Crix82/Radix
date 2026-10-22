@@ -20,7 +20,13 @@ from app.services import vectorstore
 from app.services.chunking import estimate_tokens
 from app.services.embeddings import Embedder
 from app.services.llm.base import LLMProvider
-from app.services.rag.prompts import CONDENSE_PROMPT, REFUSAL_PHRASE, SYSTEM_PROMPT
+from app.services.parsing.lang import detect_language
+from app.services.rag.prompts import (
+    CONDENSE_PROMPT,
+    REFUSAL_PHRASE,
+    SYSTEM_PROMPT,
+    TRANSLATE_PROMPT,
+)
 from app.services.search import TOP_PER_RETRIEVER, fts_search
 from app.services.search.fusion import rrf_fuse
 
@@ -47,6 +53,9 @@ HISTORY_TURNS = 6
 # history pay the extra call.
 CONDENSE_TURN_CHARS = 500  # per replayed turn in the rewrite prompt — keeps it short on CPU
 MAX_REWRITE_CHARS = 400  # longer than this is an answer or a ramble, not a question
+# An answer without [n] markers still gets sources, but only the best-ranked few: attaching the
+# whole context (12 chunks) filled the Fonti panel with pages of unrelated books (ADR 0005).
+FALLBACK_SOURCES = 3
 _CITATION_RE = re.compile(r"\[(\d{1,2})\]")
 _REWRITE_LABEL_RE = re.compile(r"^domanda riscritta\s*:\s*", re.IGNORECASE)
 
@@ -174,6 +183,7 @@ def retrieve(
     lang: str | None = None,
     doc_type: str | None = None,
     rewritten: str | None = None,
+    translated: str | None = None,
 ) -> Retrieval:
     """Hybrid retrieval for `query`; with `rewritten` (its context-resolved form, see
     condense_question) both run and the ranking of the query whose best dense hit is stronger
@@ -182,7 +192,12 @@ def retrieve(
     Not RRF-fused across the two: with k=60 a chunk ranked 2nd by the rewrite but low by the
     raw follow-up loses to chunks ranked mid-way by both, i.e. the fusion buries exactly the
     hit the rewrite exists to surface (measured in ADR 0010). Best-of-two keeps the raw
-    question as a safety net: a rewrite that drifts matches the corpus worse and loses."""
+    question as a safety net: a rewrite that drifts matches the corpus worse and loses.
+
+    With `translated` (the English form of the query, see translate_question) its dense and
+    lexical rankings are RRF-fused with the kept query's: unlike a rewrite, a translation
+    carries the same meaning, and the two languages surface different pages (ADR 0011). The
+    refusal threshold keeps reading the original language's cosine, as calibrated."""
     if allowed_collection_ids is not None and not allowed_collection_ids:
         return Retrieval(chunks=[], max_dense_score=0.0, query=query)
 
@@ -200,9 +215,22 @@ def retrieve(
         top = hits[0][1] if hits else 0.0
         if top > max_dense:  # strict: the original (first) keeps ties
             max_dense, dense, used = top, hits, q
-    fused = rrf_fuse(
-        [[cid for cid, _ in dense], fts_search(db, used, allowed_collection_ids, lang, doc_type)]
-    )
+    rankings = [
+        [cid for cid, _ in dense],
+        fts_search(db, used, allowed_collection_ids, lang, doc_type),
+    ]
+    if translated and translated != used:
+        dense_en = vectorstore.search(
+            client,
+            embedder.embed_query(translated),
+            TOP_PER_RETRIEVER,
+            allowed_collection_ids,
+            lang,
+            doc_type,
+        )
+        rankings.append([cid for cid, _ in dense_en])
+        rankings.append(fts_search(db, translated, allowed_collection_ids, lang, doc_type))
+    fused = rrf_fuse(rankings)
     fused_ids = [cid for cid, _ in fused[:TOP_CONTEXT]]
     if not fused_ids:
         return Retrieval(chunks=[], max_dense_score=max_dense, query=used)
@@ -305,6 +333,27 @@ def condense_question(provider: LLMProvider, history: list[dict[str, str]], ques
     return rewritten
 
 
+def translate_question(provider: LLMProvider, question: str) -> str | None:
+    """English form of `question` for retrieval (ADR 0011), or None when not needed or not
+    usable. An English question costs no call. Like the rewrite, the translation is a
+    retrieval aid and never what breaks a turn: on any error or odd output it is dropped."""
+    if not question or detect_language(question) == "en":
+        return None
+    messages = [
+        {"role": "system", "content": TRANSLATE_PROMPT},
+        {"role": "user", "content": question},
+    ]
+    try:
+        translated = _clean_rewrite("".join(provider.complete(messages, stream=False)))
+    except Exception:  # noqa: BLE001 — degrade to the original question only
+        logger.warning("query translation failed; retrieving without it", exc_info=True)
+        return None
+    if not translated or len(translated) > MAX_REWRITE_CHARS or translated == question:
+        return None
+    logger.info("query translated: %r -> %r", question, translated)
+    return translated
+
+
 def parse_citations(answer: str, context: list[ContextChunk]) -> list[Citation]:
     by_n = {c.n: c for c in context}
     seen: set[int] = set()
@@ -314,9 +363,10 @@ def parse_citations(answer: str, context: list[ContextChunk]) -> list[Citation]:
         if n in by_n and n not in seen:
             seen.add(n)
             citations.append(Citation.from_chunk(by_n[n]))
-    # If the model didn't cite, attach the sources actually put in the context (SPEC §8).
+    # If the model didn't cite, attach the best-ranked sources it was given (SPEC §8): the
+    # context is in retrieval order, so the first ones are the most relevant.
     if not citations:
-        citations = [Citation.from_chunk(c) for c in context]
+        citations = [Citation.from_chunk(c) for c in context[:FALLBACK_SOURCES]]
     return citations
 
 
@@ -331,14 +381,24 @@ def answer_stream(
     lang: str | None = None,
     doc_type: str | None = None,
     query_rewrite: bool = True,
+    query_translate: bool = False,
 ) -> Iterator[tuple[str, Any]]:
     """Yield ('token', str) events then one ('final', ChatResult) event."""
     question = next(
         (m["content"] for m in reversed(messages) if m.get("role") == "user"), ""
     ).strip()
     rewritten = condense_question(provider, messages, question) if query_rewrite else question
+    translated = translate_question(provider, rewritten) if query_translate else None
     retrieval = retrieve(
-        db, embedder, client, question, allowed_collection_ids, lang, doc_type, rewritten=rewritten
+        db,
+        embedder,
+        client,
+        question,
+        allowed_collection_ids,
+        lang,
+        doc_type,
+        rewritten=rewritten,
+        translated=translated,
     )
 
     if not retrieval.chunks or retrieval.max_dense_score < refusal_threshold:

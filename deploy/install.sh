@@ -136,7 +136,18 @@ case "$LLM_RUNTIME" in
     LLM_MODEL="$(ask LLM_MODEL 'Model tag to pull' "${LLM_MODEL:-qwen3.5:9b-q4_K_M}")"
     LLM_BASE_URL="http://ollama:11434/v1"
     COMPOSE_FILE="docker-compose.yml:docker-compose.llm.yml"
-    [[ "$GPU" -eq 1 ]] && COMPOSE_FILE="${COMPOSE_FILE}:docker-compose.gpu.yml"
+    if [[ "$GPU" -eq 1 ]]; then
+      COMPOSE_FILE="${COMPOSE_FILE}:docker-compose.gpu.yml"
+      # The worker shares the GPU only when there is room next to the LLM (ADR 0007).
+      VRAM_MB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null \
+        | sort -n | tail -n1 | tr -dc '0-9')"
+      if [[ "${VRAM_MB:-0}" -ge 12000 ]]; then
+        COMPOSE_FILE="${COMPOSE_FILE}:docker-compose.gpu-worker.yml"
+        ok "GPU with ${VRAM_MB} MiB — the ingestion worker will use it too"
+      else
+        info "GPU with ${VRAM_MB:-?} MiB — reserved for the LLM; the ingestion worker runs on CPU"
+      fi
+    fi
     ;;
   external)
     LLM_BASE_URL="$(ask LLM_BASE_URL 'External OpenAI-compatible base URL' "${LLM_BASE_URL:-http://127.0.0.1:11434/v1}")"

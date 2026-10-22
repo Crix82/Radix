@@ -1,0 +1,17 @@
+# GPU for the ingestion worker, layered after docker-compose.gpu.yml on cards with >= 12 GB:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.llm.yml:docker-compose.gpu.yml:docker-compose.gpu-worker.yml
+# deploy/install.sh adds it when the largest NVIDIA GPU reports at least 12 GB.
+#
+# Docling (layout/table models) and bge-m3 pick CUDA automatically (EMBED_DEVICE=auto) and stay
+# loaded after the first document. On an 8 GB card that is ~1.7 GB the LLM no longer has: measured
+# on an RTX 3070 Ti, Qwen3.5 9B went 19% onto the CPU and the chat from 68 to 43 tok/s (ADR 0007).
+# Without this file the worker runs on the CPU, which a many-core server handles well.
+services:
+  worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

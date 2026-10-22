@@ -455,3 +455,71 @@ def test_answer_stream_refusal_reports_the_rewrite_it_tried(corpus, db_session, 
     final = events[-1][1]
     assert final.refusal is True and final.retrieval_query == REWRITE
     assert [stream for stream, _ in provider.calls] == [False]  # rewritten, then refused pre-LLM
+
+
+# --- cross-lingual retrieval (ADR 0011) ---------------------------------------------------
+
+IT_Q = "Quali sono le perdite nel nucleo magnetico?"
+EN_Q = "What are the losses in the magnetic core?"
+
+
+def test_retrieve_fuses_the_translation_rankings(corpus, db_session, monkeypatch) -> None:
+    """The English query surfaces a chunk the Italian one does not rank: both end up in the
+    context, and the refusal threshold still reads the original language's cosine."""
+    fts_queries = _wire_by_query(
+        monkeypatch, {IT_Q: [(corpus["boll"], 0.52)], EN_Q: [(corpus["rs30"], 0.71)]}
+    )
+    embedder = KeyedEmbedder()
+    r = rag.retrieve(db_session, embedder, object(), IT_Q, None, translated=EN_Q)
+    assert embedder.queries == [IT_Q, EN_Q]
+    assert fts_queries == [IT_Q, EN_Q]
+    assert {c.chunk_id for c in r.chunks} == {corpus["boll"], corpus["rs30"]}
+    assert r.max_dense_score == 0.52 and r.query == IT_Q
+
+
+def test_retrieve_ignores_a_translation_equal_to_the_query(corpus, db_session, monkeypatch):
+    _wire_by_query(monkeypatch, {IT_Q: [(corpus["boll"], 0.6)]})
+    embedder = KeyedEmbedder()
+    rag.retrieve(db_session, embedder, object(), IT_Q, None, translated=IT_Q)
+    assert embedder.queries == [IT_Q]
+
+
+def test_answer_stream_translates_before_retrieving(corpus, db_session, monkeypatch) -> None:
+    _wire_by_query(monkeypatch, {IT_Q: [(corpus["boll"], 0.6)], EN_Q: [(corpus["rs30"], 0.7)]})
+    provider = ScriptedProvider(rewrite=EN_Q, tokens=["Isteresi e correnti parassite [1]."])
+    events = list(
+        rag.answer_stream(
+            db_session,
+            KeyedEmbedder(),
+            object(),
+            provider,
+            [{"role": "user", "content": IT_Q}],
+            allowed_collection_ids=None,
+            refusal_threshold=0.55,
+            query_translate=True,
+        )
+    )
+    # first turn: no rewrite call, one translation call, then the streamed answer
+    assert [stream for stream, _ in provider.calls] == [False, True]
+    assert provider.calls[0][1][-1]["content"] == IT_Q
+    # the answer prompt carries the user's own words, not the translation
+    answer_prompt = provider.calls[1][1][-1]["content"]
+    assert f"Domanda: {IT_Q}" in answer_prompt and EN_Q not in answer_prompt
+    assert events[-1][1].refusal is False
+
+
+def test_answer_stream_does_not_translate_by_default(corpus, db_session, monkeypatch) -> None:
+    _wire(monkeypatch, dense=[(corpus["boll"], 0.72)], fts=[])
+    provider = ScriptedProvider(rewrite="mai", tokens=["ok [1]"])
+    list(
+        rag.answer_stream(
+            db_session,
+            FakeEmbedder(),
+            object(),
+            provider,
+            [{"role": "user", "content": IT_Q}],
+            allowed_collection_ids=None,
+            refusal_threshold=0.55,
+        )
+    )
+    assert [stream for stream, _ in provider.calls] == [True]

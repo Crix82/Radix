@@ -148,12 +148,13 @@ Chat in streaming con indicatore "sta cercando nei documenti"; click su citazion
 - **Retrieval ibrido**: (a) dense su Qdrant, top 24; (b) FTS Postgres con `websearch_to_tsquery` nella lingua rilevata della query (fallback `simple`), top 24; fusione **RRF** (k=60); nessun reranker in v1 (estensione futura dietro interfaccia).
 - **Contesto**: top 12 chunk fusi, max ~6.000 token, ognuno etichettato `[n]` con titolo documento e pagina (era top 8 / ~3.500: rivisto il 2026-10-22, ADR 0005).
 - **Riscrittura contestuale della query** (post-M6, ADR 0010): dal secondo turno di una conversazione l'LLM condensa la domanda in una domanda autonoma (una chiamata breve, non-streaming, sugli ultimi turni); il retrieval gira su originale **e** riscritta e tiene la classifica di quella con la cosine densa migliore (a parità l'originale); la soglia di rifiuto legge quella stessa cosine. La riscrittura serve solo al retrieval: il prompt di risposta riporta le parole dell'utente. Disattivabile con `RAG_QUERY_REWRITE=false`.
+- **Ricerca cross-lingua** (post-M6, ADR 0011): una domanda non inglese viene anche tradotta in inglese (una chiamata breve all'LLM) e le classifiche delle due lingue si fondono con RRF; la soglia di rifiuto legge la cosine della domanda originale. Disattivabile con `RAG_QUERY_TRANSLATE=false`.
 - **Soglia di rifiuto**: se il miglior punteggio fuso < `refusal_threshold` (in `settings`, calibrata in M4 sull'eval set) → risposta fissa **senza chiamare l'LLM**: *"Non presente nella documentazione indicizzata."* + suggerimento di aggiungere la fonte.
 - **Prompt di sistema** (base, in `services/rag/prompts.py`):
 
 > Sei Radix, l'assistente documentale dell'azienda. Rispondi **esclusivamente** sulla base dei passaggi forniti nel contesto. Dopo ogni affermazione fattuale inserisci la citazione `[n]` del passaggio che la supporta. Rispondi nella lingua della domanda, anche se i documenti sono in un'altra lingua. Se il contesto copre solo in parte la domanda, dillo esplicitamente. Se il contesto non contiene la risposta, rispondi esattamente: "Non presente nella documentazione indicizzata." Non usare conoscenza esterna ai passaggi forniti.
 
-- **Post-processing**: parse dei marcatori `[n]` → mappa alle citazioni; se il modello non cita, allega comunque le fonti usate nel contesto. Streaming SSE token-by-token; l'evento `final` porta le citazioni strutturate.
+- **Post-processing**: parse dei marcatori `[n]` → mappa alle citazioni; se il modello non cita, allega comunque le prime 3 fonti del contesto per pertinenza (prima: tutte; rivisto il 2026-10-22, ADR 0005). Streaming SSE token-by-token; l'evento `final` porta le citazioni strutturate.
 - **`LLMProvider`**: interfaccia `complete(messages, stream=True, json_schema=None)`; implementazioni `OllamaProvider` (default) e `VLLMProvider`; selezione e modello via env (`LLM_PROVIDER`, `LLM_MODEL`, `LLM_BASE_URL`).
 
 ---

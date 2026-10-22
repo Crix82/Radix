@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # extra short LLM call per turn that has history. Turn off on CPU-only hosts if the added
     # latency is not worth it: retrieval then sees only the latest message, as before.
     rag_query_rewrite: bool = True
+    # Also search with the question translated into English and fuse the rankings (ADR 0011):
+    # Italian questions over English manuals otherwise rank the right page too low. One short
+    # LLM call per non-English turn; turn off on CPU-only hosts if the latency is not worth it.
+    rag_query_translate: bool = True
 
     embed_device: str = "auto"
     embed_model: str = "BAAI/bge-m3"

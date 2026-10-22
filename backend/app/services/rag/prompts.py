@@ -27,3 +27,13 @@ CONDENSE_PROMPT = (
     "della domanda. Non rispondere alla domanda e non aggiungere commenti: restituisci "
     "soltanto la domanda riscritta, su una riga."
 )
+
+# Cross-lingual retrieval (ADR 0011): the question is also translated into English and both
+# versions are searched, then fused. Italian questions over English manuals otherwise rank the
+# right page too low: bge-m3 is multilingual but scores cross-language pairs lower, and the
+# lexical search finds no shared words at all. The translation is used for retrieval only.
+TRANSLATE_PROMPT = (
+    "Translate the user's question into English for a search engine over technical documents. "
+    "Keep technical terms, product names, codes, numbers and units unchanged. "
+    "Output only the translated question, on one line, nothing else."
+)

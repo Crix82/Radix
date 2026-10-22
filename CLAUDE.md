@@ -62,7 +62,8 @@ source of truth for the UI. Work proceeds one milestone at a time (SPEC §11).
   detection, `.env` load). They are bash, outside the ruff/mypy gate — verify with `bash -n`
   (and `shellcheck` if installed).
 - **LLM runtime switch is `COMPOSE_FILE` in `.env`**, not compose profiles: `docker-compose.yml`
-  (external) `:docker-compose.llm.yml` (bundled CPU) `:docker-compose.gpu.yml` (bundled GPU).
+  (external) `:docker-compose.llm.yml` (bundled CPU) `:docker-compose.gpu.yml` (bundled GPU,
+  LLM only) `:docker-compose.gpu-worker.yml` (worker on GPU too, only on cards >= 12 GB).
   `install.sh` writes it; the dev stack (`make up`) is unaffected. Don't add `depends_on: ollama`
   to api/worker in the prod base compose.
 - Prod runs `alembic upgrade head` at container start and seeds the admin from `ADMIN_*`;

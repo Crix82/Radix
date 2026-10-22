@@ -21,6 +21,7 @@ import yaml
 BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(BACKEND))
 
+from app.core.config import get_settings  # noqa: E402
 from app.services import rag  # noqa: E402
 from app.services.rag import ChatResult  # noqa: E402
 from app.services.rag.prompts import REFUSAL_PHRASE  # noqa: E402
@@ -75,6 +76,7 @@ def run_turn(deps: EvalDeps, messages: list[dict[str, str]]) -> ChatResult:
         messages=messages,
         allowed_collection_ids=None,
         refusal_threshold=deps.threshold,
+        query_translate=get_settings().rag_query_translate,
     ):
         if kind == "final":
             result = payload

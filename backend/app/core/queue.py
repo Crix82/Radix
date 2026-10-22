@@ -6,6 +6,12 @@ from rq import Queue
 from app.core.config import get_settings
 
 QUEUE_NAME = "radix"
+# RQ stops a job after 180 s unless told otherwise, and the stop lands *inside* Docling, which
+# records it as a failed page and ends the conversion as "Pipeline failed" — so any document
+# that takes more than three minutes (a scanned book under OCR, a 481-page manual on CPU)
+# errored with no hint of a timeout. Parsing and embedding get a bound sized for a large
+# scanned book on CPU; source syncs keep the short default.
+DOCUMENT_JOB_TIMEOUT = 6 * 3600  # seconds
 
 
 def get_queue() -> Queue:
@@ -18,8 +24,8 @@ def enqueue_sync_source(source_id: int) -> None:
 
 
 def enqueue_parse_document(document_id: int) -> None:
-    get_queue().enqueue("worker.jobs.parse_document", document_id)
+    get_queue().enqueue("worker.jobs.parse_document", document_id, job_timeout=DOCUMENT_JOB_TIMEOUT)
 
 
 def enqueue_embed_chunks(document_id: int) -> None:
-    get_queue().enqueue("worker.jobs.embed_chunks", document_id)
+    get_queue().enqueue("worker.jobs.embed_chunks", document_id, job_timeout=DOCUMENT_JOB_TIMEOUT)

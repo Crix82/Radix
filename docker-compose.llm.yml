@@ -13,6 +13,10 @@ services:
       # 6000 tokens of excerpts (rag.MAX_CONTEXT_TOKENS) plus system prompt, history and the
       # answer; past the limit Ollama silently drops the start of the prompt. See ADR 0005.
       OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-12288}
+      # Keep the model loaded: Ollama's default unloads it after 5 idle minutes, and the next
+      # question then waits for the reload (17-89 s measured on an RTX 3070 Ti). Safe because the
+      # GPU is the LLM's alone unless docker-compose.gpu-worker.yml is layered (>= 12 GB cards).
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:--1}
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
