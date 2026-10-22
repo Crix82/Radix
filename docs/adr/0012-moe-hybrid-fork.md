@@ -68,3 +68,10 @@ ok, follow-up 4/4. Risolve i tre calcoli/confronti su cui Qwen rifiutava (#18, #
 **inventa un elenco di norme IEEE "valide nel 2026"** sulla domanda trappola #25. In ~40% delle
 risposte cita nel proprio formato (`【11†L1-L3】`) invece di `[n]`: ora normalizzato da
 `normalize_citations` prima dell'estrazione delle fonti.
+
+Test Excel con `-b/-ub 8192` e citazioni normalizzate: **48/52** (contro 43/52 di `main`), primo
+token mediano **11,8 s** (traduzione della domanda ~2 s + retrieval + prefill di ~6000 token),
+risposta completa mediana 15,7 s; `make eval` 10/10, rifiuto ok, follow-up 4/4. Le citazioni ora
+puntano alle pagine giuste (#6, #9); sulla trappola #25 elenca le norme citate nei testi e
+dichiara che il contesto non dice quali siano vigenti nel 2026. Restano errate #7 (limiti di
+emergenza invece della tabella di p.24) e #11 (pagina 124 mai recuperata), come su `main`.
