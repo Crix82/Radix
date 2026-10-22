@@ -24,13 +24,18 @@ from app.services.rag.prompts import CONDENSE_PROMPT, REFUSAL_PHRASE, SYSTEM_PRO
 from app.services.search import TOP_PER_RETRIEVER, fts_search
 from app.services.search.fusion import rrf_fuse
 
-TOP_CONTEXT = 8
-MAX_CONTEXT_TOKENS = 3500
+# 12 fused chunks in a 6000-token budget (ADR 0005, 2026-10-22). On a 481-page book with
+# Italian questions over English text the expected page often ranks 6th-12th: with 8 chunks
+# plus neighbours in 3500 tokens only the first 2-4 hits reached the LLM (expected page in
+# context 12/25 → 19/25 with this setting). The budget must fit OLLAMA_CONTEXT_LENGTH together
+# with system prompt, history and the answer.
+TOP_CONTEXT = 12
+MAX_CONTEXT_TOKENS = 6000
 # When a chunk is retrieved, also pull this many chunks on each side of it within the same
-# document. Retrieval matches a single chunk, but a fact can straddle a chunk boundary (an
-# invoice's payee header and its total line land in adjacent chunks); the neighbours carry the
-# rest of the fact into the LLM context. See _expand_with_neighbors.
-NEIGHBOR_RADIUS = 1
+# document, for a fact that straddles a chunk boundary (an invoice's payee header and its total
+# line). Off by default: each neighbour costs the budget a whole retrieved hit, and on large
+# documents the hits are worth more. See _expand_with_neighbors.
+NEIGHBOR_RADIUS = 0
 # How many prior turns to replay into the prompt. Conversations are persisted and can grow
 # without bound, so the history has to be capped or the prompt does too; 3 exchanges is enough
 # for follow-up questions ("e per il modello B?") while leaving the context budget to retrieval.
@@ -111,13 +116,15 @@ class ChatResult:
 
 
 def _expand_with_neighbors(
-    db: Session, ordered_ids: list[int], radius: int = NEIGHBOR_RADIUS
+    db: Session, ordered_ids: list[int], radius: int | None = None
 ) -> list[int]:
     """Grow the selected chunk ids with their same-document neighbours (adjacent in chunk-id
     order — ids are monotonic within a document, see worker/jobs.py). Fusion order is kept:
     each anchor is emitted with its window of neighbours, de-duplicated. Neighbours share the
     anchor's document (hence its collection), so this surfaces no chunk the caller wasn't
     already permitted to retrieve."""
+    if radius is None:
+        radius = NEIGHBOR_RADIUS
     if radius <= 0 or not ordered_ids:
         return ordered_ids
     doc_of: dict[int, int] = {

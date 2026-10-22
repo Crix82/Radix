@@ -10,9 +10,9 @@ services:
       - ${DATA_DIR:-./data}/models:/root/.ollama
     environment:
       # Ollama sizes the context from VRAM (4096 on cards under 24 GB). A RAG prompt is up to
-      # 3500 tokens of excerpts plus system prompt, history and the answer, so 4096 is too
-      # tight: Ollama would silently drop the start of the prompt. See ADR 0005.
-      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-8192}
+      # 6000 tokens of excerpts (rag.MAX_CONTEXT_TOKENS) plus system prompt, history and the
+      # answer; past the limit Ollama silently drops the start of the prompt. See ADR 0005.
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-12288}
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s

@@ -24,3 +24,6 @@ backups/
 .idea/
 .vscode/
 .DS_Store
+
+# Private test sets (customer questions/documents) — never committed
+eval/private/

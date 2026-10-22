@@ -44,3 +44,17 @@ eval harness).
   sull'eval si misuravano già 3442 token per richiesta, e oltre 4096 Ollama taglia l'inizio del
   prompt senza errori. `OLLAMA_CONTEXT_LENGTH` (default 8192, sovrascrivibile da `.env`) nei
   compose bundled e dev. Il costo è solo memoria per la KV cache, non velocità.
+- **Contesto: top 12, senza vicini, budget 6000 token; Ollama a 12288** (2026-10-22, test su
+  un libro di 481 pagine con 26 domande in italiano su testo inglese, corpus con altri due
+  libri dello stesso tema). La pagina attesa si piazzava spesso tra il 6° e il 12° posto, ma
+  con top 8 + vicini ±1 in 3500 token al modello arrivavano solo i primi 2–4 risultati: pagina
+  attesa nel contesto 12/25. Simulazione sul server: top 8 + vicini a 6000 token → 14/25;
+  **top 12 senza vicini a 6000 → 19/25** (top 16 non aggiunge nulla). Scelta: `TOP_CONTEXT=12`,
+  `MAX_CONTEXT_TOKENS=6000`, `NEIGHBOR_RADIUS=0` (il meccanismo resta, spento di default) e
+  `OLLAMA_CONTEXT_LENGTH` di default 12288, perché 6000 token di estratti più system prompt,
+  storico e risposta non stanno in 8192. Compromesso accettato: senza vicini un fatto spezzato
+  tra due chunk adiacenti (il caso fattura che li aveva motivati) può tornare a mancare.
+  Costo: primo token più lento (più prompt da leggere). La FTS non contribuisce mai su domande
+  IT / testo EN (nessun termine in comune): resta utile sui corpus nella lingua delle domande.
+  Restano fuori le domande con la pagina giusta molto in basso (rango 13–127): servirebbe un
+  reranker o la traduzione della query, rimandati.

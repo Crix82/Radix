@@ -118,8 +118,16 @@ def invoice_doc(db_session: Session) -> list[int]:
     return ids
 
 
+def test_retrieve_does_not_expand_by_default(invoice_doc, db_session, monkeypatch) -> None:
+    header, _total, _notes = invoice_doc
+    _wire(monkeypatch, dense=[(header, 0.61)], fts=[])
+    r = rag.retrieve(db_session, FakeEmbedder(), object(), "importo fattura gerunda", None)
+    assert [c.chunk_id for c in r.chunks] == [header]
+
+
 def test_retrieve_expands_to_neighbors(invoice_doc, db_session, monkeypatch) -> None:
     header, total, _notes = invoice_doc
+    monkeypatch.setattr(rag, "NEIGHBOR_RADIUS", 1)
     # Only the payee-header chunk is retrieved; the amount lives in the next chunk.
     _wire(monkeypatch, dense=[(header, 0.61)], fts=[])
     r = rag.retrieve(db_session, FakeEmbedder(), object(), "importo fattura gerunda", None)
@@ -130,6 +138,7 @@ def test_retrieve_expands_to_neighbors(invoice_doc, db_session, monkeypatch) -> 
 
 def test_neighbor_expansion_dedupes_shared_neighbor(invoice_doc, db_session, monkeypatch) -> None:
     header, total, notes = invoice_doc
+    monkeypatch.setattr(rag, "NEIGHBOR_RADIUS", 1)
     # header's window is [header, total]; notes' window is [total, notes] — total is shared.
     _wire(monkeypatch, dense=[(header, 0.6), (notes, 0.5)], fts=[])
     r = rag.retrieve(db_session, FakeEmbedder(), object(), "q", None)

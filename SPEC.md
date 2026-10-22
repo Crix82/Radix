@@ -146,7 +146,7 @@ Chat in streaming con indicatore "sta cercando nei documenti"; click su citazion
 ## 8. Ricerca ibrida e RAG
 
 - **Retrieval ibrido**: (a) dense su Qdrant, top 24; (b) FTS Postgres con `websearch_to_tsquery` nella lingua rilevata della query (fallback `simple`), top 24; fusione **RRF** (k=60); nessun reranker in v1 (estensione futura dietro interfaccia).
-- **Contesto**: top 8 chunk fusi, max ~3.500 token, ognuno etichettato `[n]` con titolo documento e pagina.
+- **Contesto**: top 12 chunk fusi, max ~6.000 token, ognuno etichettato `[n]` con titolo documento e pagina (era top 8 / ~3.500: rivisto il 2026-10-22, ADR 0005).
 - **Riscrittura contestuale della query** (post-M6, ADR 0010): dal secondo turno di una conversazione l'LLM condensa la domanda in una domanda autonoma (una chiamata breve, non-streaming, sugli ultimi turni); il retrieval gira su originale **e** riscritta e tiene la classifica di quella con la cosine densa migliore (a parità l'originale); la soglia di rifiuto legge quella stessa cosine. La riscrittura serve solo al retrieval: il prompt di risposta riporta le parole dell'utente. Disattivabile con `RAG_QUERY_REWRITE=false`.
 - **Soglia di rifiuto**: se il miglior punteggio fuso < `refusal_threshold` (in `settings`, calibrata in M4 sull'eval set) → risposta fissa **senza chiamare l'LLM**: *"Non presente nella documentazione indicizzata."* + suggerimento di aggiungere la fonte.
 - **Prompt di sistema** (base, in `services/rag/prompts.py`):
