@@ -47,7 +47,7 @@ lint:
 	cd backend && .venv/bin/ruff check app worker tests migrations ../eval
 	cd backend && .venv/bin/ruff format --check app worker tests migrations ../eval
 	cd backend && .venv/bin/mypy app worker
-	cd backend && .venv/bin/mypy --explicit-package-bases ../eval/run_eval.py ../eval/bench.py
+	cd backend && .venv/bin/mypy --explicit-package-bases ../eval/run_eval.py ../eval/bench.py ../eval/qa_test.py
 	cd frontend && npm run typecheck
 
 licenses:  ## fail on any non-permissive license (SPEC §14)
