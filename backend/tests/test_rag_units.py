@@ -65,6 +65,14 @@ def test_build_messages_has_system_context_and_question() -> None:
     assert "Domanda: Qual è la coppia di serraggio?" in last["content"]
 
 
+def test_build_messages_shows_the_section_of_each_passage() -> None:
+    ctx = _ctx(1, page=124)
+    ctx.section = "2.5 Dry-Type Transformers › 2.5.1 Transformer Taps"
+    content = build_messages([ctx, _ctx(2)], [], "Prese?")[-1]["content"]
+    assert f"(Doc 1, pag. 124, sezione: {ctx.section})" in content
+    assert "(Doc 2, pag. 10)\n" in content  # no section: header unchanged
+
+
 def test_build_messages_keeps_prior_turns() -> None:
     context = [_ctx(1)]
     history = [

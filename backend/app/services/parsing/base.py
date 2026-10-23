@@ -30,6 +30,7 @@ class ParsedBlock:
     bbox: BBox | None = None
     heading_path: tuple[str, ...] = ()  # e.g. ("Section 4. Maintenance", "4.2 Cylinder head bolts")
     is_heading: bool = False
+    is_table: bool = False  # a table exported as markdown: chunked on its own
 
 
 @dataclass

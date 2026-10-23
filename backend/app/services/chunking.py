@@ -25,6 +25,16 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // CHARS_PER_TOKEN)
 
 
+def contextual_text(heading_path: str | None, text: str) -> str:
+    """What the dense retriever embeds: the chunk under its section path.
+
+    A chunk alone often lacks its subject ("Typically two taps above and two below rated
+    voltage" never says "dry-type"); the subject lives in the headings above it. The stored
+    chunk text stays as parsed: citations and highlights point at what is on the page.
+    """
+    return f"{heading_path}\n\n{text}" if heading_path else text
+
+
 @dataclass
 class Chunk:
     text: str
@@ -93,6 +103,17 @@ def _chunk_group(blocks: list[ParsedBlock], lang: str) -> list[Chunk]:
     new_since_emit = False
     for block in blocks:
         tokens = estimate_tokens(block.text)
+        if block.is_table:
+            # A table is its own chunk: its caption and cells are what it is about. Packed with
+            # the prose around it, the chunk's vector follows the prose — Docling often places
+            # a table under the *next* section header (seen: "Standard limits for Temperature
+            # Rises" filed under "Insulation Classes"), where no question about it finds it.
+            if acc.blocks and new_since_emit:
+                chunks.append(_finish(acc.blocks, lang))
+            chunks.append(_finish([block], lang))
+            acc.clear()
+            new_since_emit = False
+            continue
         # A single oversized block still becomes its own chunk rather than being split
         # mid-sentence: provenance (page/bbox) must stay intact.
         if acc.tokens and acc.tokens + tokens > MAX_TOKENS:

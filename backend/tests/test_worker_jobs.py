@@ -278,6 +278,26 @@ def test_embed_chunks_indexes_and_upserts(worker_db: Session, embed_env: _FakeVe
     assert len(point.vector) == 3
 
 
+def test_embed_chunks_embeds_the_section_path_with_the_text(
+    worker_db: Session, embed_env: _FakeVectorstore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc = _seed_chunked_document(worker_db, n_chunks=1)
+    chunk = worker_db.scalars(select(Chunk).where(Chunk.document_id == doc.id)).one()
+    chunk.heading_path = "2.5 Dry-Type Transformers"
+    worker_db.commit()
+    seen: list[str] = []
+
+    class _Recording(_FakeEmbedder):
+        def embed_texts(self, texts: list[str]) -> list[list[float]]:
+            seen.extend(texts)
+            return super().embed_texts(texts)
+
+    monkeypatch.setattr(jobs, "get_embedder", lambda: _Recording())
+    jobs.embed_chunks(doc.id)
+
+    assert seen == ["2.5 Dry-Type Transformers\n\nchunk 0"]
+
+
 def test_embed_chunks_with_no_chunks_still_indexes(
     worker_db: Session, embed_env: _FakeVectorstore
 ) -> None:

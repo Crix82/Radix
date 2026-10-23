@@ -94,3 +94,29 @@ def test_empty_and_whitespace_blocks_are_dropped() -> None:
 
 def test_overlap_constant_is_smaller_than_target() -> None:
     assert OVERLAP_TOKENS < TARGET_TOKENS <= MAX_TOKENS
+
+
+def test_contextual_text_puts_the_section_path_above_the_chunk() -> None:
+    from app.services.chunking import contextual_text
+
+    path = "2.5 Dry-Type Transformers › 2.5.1 Transformer Taps"
+    assert contextual_text(path, "Two taps above.") == f"{path}\n\nTwo taps above."
+    assert contextual_text(None, "Two taps above.") == "Two taps above."
+
+
+def test_a_table_is_a_chunk_of_its_own() -> None:
+    h = ("2.1.2.2 Insulation Classes",)
+    table = ParsedBlock(
+        text="| Hot spot temperature rise | 80°C |", page=24, heading_path=h, is_table=True
+    )
+    doc = ParsedDocument(
+        lang="en",
+        page_count=1,
+        blocks=[block("Insulation is rated by the BIL.", 24, h), table, block("Neutral.", 24, h)],
+    )
+    texts = [c.text for c in chunk_document(doc)]
+    assert texts == [
+        "Insulation is rated by the BIL.",
+        "| Hot spot temperature rise | 80°C |",
+        "Neutral.",
+    ]

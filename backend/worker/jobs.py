@@ -15,7 +15,7 @@ from app.core.db import SessionLocal
 from app.core.queue import enqueue_embed_chunks
 from app.models import Chunk, Document, DocumentStatus, Source
 from app.services import ingest, vectorstore
-from app.services.chunking import chunk_document
+from app.services.chunking import chunk_document, contextual_text
 from app.services.embeddings import get_embedder
 from app.services.parsing import get_parser, probe_text_layer
 from app.services.parsing.base import ParsedDocument
@@ -136,7 +136,9 @@ def _embed_and_index(db: Session, document: Document) -> int:
     vectorstore.delete_document_points(client, document.id)
 
     if chunks:
-        vectors = get_embedder().embed_texts([c.text for c in chunks])
+        vectors = get_embedder().embed_texts(
+            [contextual_text(c.heading_path, c.text) for c in chunks]
+        )
         vectorstore.upsert_chunks(
             client,
             [

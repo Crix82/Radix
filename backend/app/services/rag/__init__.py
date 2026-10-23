@@ -80,6 +80,7 @@ class ContextChunk:
     page: int
     text: str
     bboxes: dict[str, Any] | None
+    section: str | None = None  # heading path, shown to the model with the passage
 
 
 @dataclass
@@ -239,7 +240,8 @@ def retrieve(
     rows = db.execute(
         text(
             """
-            SELECT c.id, c.document_id, c.page_start, c.text, c.bboxes, d.title, d.lang
+            SELECT c.id, c.document_id, c.page_start, c.text, c.bboxes, d.title, d.lang,
+                   c.heading_path
             FROM chunks c JOIN documents d ON d.id = c.document_id
             WHERE c.id IN :ids AND d.deleted_at IS NULL AND d.status = 'indexed'
             """
@@ -267,15 +269,23 @@ def retrieve(
                 bboxes=_as_dict(row[4]),
                 title=row[5],
                 lang=row[6],
+                section=row[7],
             )
         )
     return Retrieval(chunks=chunks, max_dense_score=max_dense, query=used)
 
 
+def _source_label(c: ContextChunk) -> str:
+    """Passage header: document, page and section — the section tells the model what a short
+    passage is about (a list of taps means nothing without "Dry-Type Transformers" above it)."""
+    label = f"{c.title or '—'}, pag. {c.page}"
+    return f"{label}, sezione: {c.section}" if c.section else label
+
+
 def build_messages(
     context: list[ContextChunk], history: list[dict[str, str]], question: str
 ) -> list[dict[str, str]]:
-    block = "\n\n".join(f"[{c.n}] ({c.title or '—'}, pag. {c.page})\n{c.text}" for c in context)
+    block = "\n\n".join(f"[{c.n}] ({_source_label(c)})\n{c.text}" for c in context)
     augmented = f"Contesto:\n{block}\n\nDomanda: {question}"
     prior = [m for m in history if m.get("role") in ("user", "assistant")][:-1][-HISTORY_TURNS:]
     return [
