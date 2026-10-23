@@ -50,9 +50,17 @@ def ensure_collection(client: QdrantClient) -> None:
         client.create_payload_index(collection_name=name, field_name=field, field_schema=schema)
 
 
+# Points per upsert request. Qdrant rejects a JSON body over 32 MB; a 1024-float point is
+# ~20 KB as JSON, so a single request for a ~1,600-chunk book already fails.
+UPSERT_BATCH = 256
+
+
 def upsert_chunks(client: QdrantClient, points: list[ChunkPoint]) -> None:
-    if not points:
-        return
+    for start in range(0, len(points), UPSERT_BATCH):
+        _upsert_batch(client, points[start : start + UPSERT_BATCH])
+
+
+def _upsert_batch(client: QdrantClient, points: list[ChunkPoint]) -> None:
     client.upsert(
         collection_name=get_settings().qdrant_collection,
         points=[
