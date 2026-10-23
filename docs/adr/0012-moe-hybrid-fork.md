@@ -75,3 +75,17 @@ risposta completa mediana 15,7 s; `make eval` 10/10, rifiuto ok, follow-up 4/4. 
 puntano alle pagine giuste (#6, #9); sulla trappola #25 elenca le norme citate nei testi e
 dichiara che il contesto non dice quali siano vigenti nel 2026. Restano errate #7 (limiti di
 emergenza invece della tabella di p.24) e #11 (pagina 124 mai recuperata), come su `main`.
+
+### DeepSeek-V4-Flash-0731 UD-Q3_K_XL (2026-10-23, llama.cpp b11459, `--fit`, `-b/-ub 8192`)
+
+120 GB su disco (4 file, MIT), architettura `deepseek4` supportata da b11459, ragionamento spento
+di default nel template. Prompt RAG di 5.345 token: lettura **280 tok/s** (gpt-oss 723), scrittura
+**3,9–5,5 tok/s** (gpt-oss ~33): 6–8 volte più lento a scrivere, nonostante il modello stia tutto
+in RAM.
+
+Test Excel: **46/52** (gpt-oss 48, `main` 43), ma primo token mediano **161 s** e risposta
+completa mediana 192 s; #7 e #11 hanno impiegato ~50 minuti ciascuna prima di rifiutare.
+`make eval` 10/10, rifiuto ok, follow-up 4/4; `bench.py` primo token mediano 16 s, 4,8 tok/s.
+Rispetto a gpt-oss: stesse risposte corrette su #18, #20 e #25 (rifiuta invece di inventare), ma
+rifiuta la #21 (confronto tra prova di rapporto e DGA). Su questo hardware non è utilizzabile in
+un'interfaccia di chat.
