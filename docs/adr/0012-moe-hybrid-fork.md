@@ -89,3 +89,20 @@ completa mediana 192 s; #7 e #11 hanno impiegato ~50 minuti ciascuna prima di ri
 Rispetto a gpt-oss: stesse risposte corrette su #18, #20 e #25 (rifiuta invece di inventare), ma
 rifiuta la #21 (confronto tra prova di rapporto e DGA). Su questo hardware non è utilizzabile in
 un'interfaccia di chat.
+
+### Qwen3-235B-A22B-Instruct-2507 UD-Q4_K_XL (2026-10-23, llama.cpp b11459, `--fit`, `-b/-ub 8192`)
+
+134 GB su disco (3 file, Apache-2.0), nessun ragionamento (variante Instruct). Prompt RAG di
+5.520 token: lettura **356 tok/s**, scrittura **4,4–7,3 tok/s**.
+
+Test Excel: **42/52** (gpt-oss 48, DeepSeek-V4-Flash 46, `main` 43), primo token mediano
+**21 s**, risposta completa mediana 55 s; `make eval` 10/10, rifiuto ok, follow-up 4/4;
+`bench.py` primo token mediano 4,4 s, 4,5 tok/s. È l'unico che si avvicina alla tabella di
+p.24 sulla #7 (65/80 °C giusti, liquido 55 invece di 65 °C), ma rifiuta #18, #19 e #21, che
+gpt-oss risolve, e sbaglia una delle tre applicazioni dei reattori (#12).
+
+### Sintesi
+
+Su questo server **gpt-oss-120b è il migliore** per qualità (48/52) e l'unico con tempi da chat
+(primo token ~12 s, scrittura ~33 tok/s): ha ~5B parametri attivi contro i ~13B di
+DeepSeek-V4-Flash e i 22B di Qwen3-235B, e la scrittura è limitata dalla banda della RAM.
