@@ -53,4 +53,8 @@ Test del cliente (26 domande, massimo 52 punti), Qwen3.5 9B, server con RTX 3070
 - Excel con tabelle e titoli (tabelle ancora unite al testo): **45/52** (prima 43). #11 corretta;
   #7 a 0 perché la tabella era nel brano sull'isolamento. Eval invariato: 10/10 citazioni,
   rifiuto corretto, follow-up 4/4; primo token mediano 2,6 s.
-- Tabelle come brani a sé: misura in corso.
+- Tabelle come brani a sé: **44/52**, cioè invariato (#20 perde 1 punto per variabilità del
+  modello). La #7 resta a 0: il brano della tabella 2.1.1 è corto, non dice "immerso in liquido"
+  (lo dice il paragrafo prima) e porta ancora il titolo "Insulation Classes", quindi arriva al 45°
+  posto. Possibile passo successivo: includere nell'embedding della tabella il paragrafo che la
+  precede.
